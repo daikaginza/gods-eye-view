@@ -93,7 +93,7 @@ export const CAP_SOURCES = Object.freeze({
   kde: e('', 'global', 'catalog', false),
 });
 function pathWithinPrefix(pathname, prefix) {
-  const root = prefix.length > 1 ? prefix.replace(/\\/+$/, '') : prefix;
+  const root = prefix.length > 1 ? prefix.replace(/\/+$/, '') : prefix;
   return root === '/' || pathname === root || pathname.startsWith(`${root}/`);
 }
 function normalizedCapUrl(source, value) {
