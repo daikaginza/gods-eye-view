@@ -270,6 +270,39 @@ test('cold clients share one publisher refresh and reuse the cache', async () =>
   assert.equal(calls, 1);
 });
 
+test('cold total outage is not cached as an empty success', async () => {
+  let calls = 0;
+  const proxy = capProxy({
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) throw Error('offline');
+      return okResponse(
+        capAlert({
+          identifier: 'recovered',
+          sent: '2026-01-01T00:00:00Z',
+        }),
+      );
+    },
+    sources: {
+      one: {
+        url: 'https://cap.example/alerts.xml',
+        region: 'x',
+        format: 'cap',
+        enabled: true,
+      },
+    },
+    cacheTtlMs: 60000,
+  });
+  const first = await runProxy(proxy);
+  assert.equal(first.alerts.length, 0);
+  assert.equal(first.generatedAt, null);
+  const second = await runProxy(proxy);
+  assert.equal(calls, 2, 'a cold outage gets another acquisition attempt');
+  assert.equal(second.alerts.length, 1);
+  assert.equal(second.alerts[0].identifier, 'recovered');
+  assert.ok(second.generatedAt);
+});
+
 test('document limit is global across RSS sources', async () => {
   let documentFetches = 0;
   const sources = {
