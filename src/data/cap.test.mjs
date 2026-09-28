@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseCap } from './cap.js';
 import { createCapState } from './capState.js';
 import {
+  allowedCapUrl,
   CAP_SOURCES,
   capProxy,
   extractCapLinks,
@@ -163,4 +164,148 @@ test('provider uses catalog and tolerates partial failure', async () => {
   };
   await p.handle({ url: '/api/cap' }, res, () => {});
   assert.equal(JSON.parse(res.body).alerts.length, 1);
+});
+
+
+const capAlert = ({
+  identifier,
+  sent,
+  msgType = 'Alert',
+  references = '',
+  event = '',
+}) =>
+  `<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><identifier>${identifier}</identifier><sender>x</sender><sent>${sent}</sent><msgType>${msgType}</msgType>${references ? `<references>${references}</references>` : ''}${event ? `<info><event>${event}</event></info>` : ''}</alert>`;
+const okResponse = (body) => ({
+  ok: true,
+  headers: new Headers(),
+  text: async () => body,
+});
+const runProxy = async (proxy) => {
+  const res = {
+    body: '',
+    setHeader() {},
+    end(x) {
+      this.body = x;
+    },
+  };
+  await proxy.handle({ url: '/api/cap' }, res, () => {});
+  return JSON.parse(res.body);
+};
+
+test('NWS Atom links use the registered CAP document path', () => {
+  const source = CAP_SOURCES.nws;
+  assert.deepEqual(
+    extractCapLinks(
+      '<link href="https://api.weather.gov/alerts/urn:oid:test.cap"/><link href="https://api.weather.gov/alerts-evil/test.cap"/><link href="https://user@api.weather.gov/alerts/test.cap"/>',
+      source,
+    ),
+    ['https://api.weather.gov/alerts/urn:oid:test.cap'],
+  );
+  assert.equal(
+    allowedCapUrl(source, 'https://api.weather.gov/alerts-evil/test.cap'),
+    false,
+  );
+});
+
+test('provider applies CAP lifecycle before serving alerts', async () => {
+  const xml =
+    capAlert({
+      identifier: 'a',
+      sent: '2026-01-01T00:00:00Z',
+      event: 'Original',
+    }) +
+    capAlert({
+      identifier: 'u',
+      sent: '2026-01-02T00:00:00Z',
+      msgType: 'Update',
+      references: 'x,a,2026-01-01T00:00:00Z',
+      event: 'Updated',
+    });
+  const proxy = capProxy({
+    fetchImpl: async () => okResponse(xml),
+    sources: {
+      one: {
+        url: 'https://cap.example/alerts.xml',
+        region: 'x',
+        format: 'cap',
+        enabled: true,
+      },
+    },
+  });
+  const body = await runProxy(proxy);
+  assert.equal(body.alerts.length, 1);
+  assert.equal(body.alerts[0].identifier, 'a');
+  assert.equal(body.alerts[0].info[0].event, 'Updated');
+});
+
+test('cold clients share one publisher refresh and reuse the cache', async () => {
+  let calls = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const proxy = capProxy({
+    fetchImpl: async () => {
+      calls += 1;
+      await gate;
+      return okResponse(cap('<msgType>Alert</msgType>'));
+    },
+    sources: {
+      one: {
+        url: 'https://cap.example/alerts.xml',
+        region: 'x',
+        format: 'cap',
+        enabled: true,
+      },
+    },
+    cacheTtlMs: 60000,
+  });
+  const first = runProxy(proxy);
+  const second = runProxy(proxy);
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  release();
+  await Promise.all([first, second]);
+  await runProxy(proxy);
+  assert.equal(calls, 1);
+});
+
+test('document limit is global across RSS sources', async () => {
+  let documentFetches = 0;
+  const sources = {
+    one: {
+      url: 'https://one.example/feed',
+      region: 'one',
+      format: 'rss',
+      enabled: true,
+    },
+    two: {
+      url: 'https://two.example/feed',
+      region: 'two',
+      format: 'rss',
+      enabled: true,
+    },
+  };
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/feed')) {
+      return okResponse(
+        `<link href="${url}/a.xml"/><link href="${url}/b.xml"/>`,
+      );
+    }
+    documentFetches += 1;
+    return okResponse(
+      capAlert({
+        identifier: String(documentFetches),
+        sent: '2026-01-01T00:00:00Z',
+      }),
+    );
+  };
+  const proxy = capProxy({
+    fetchImpl,
+    sources,
+    maxDocuments: 2,
+    concurrency: 2,
+  });
+  await runProxy(proxy);
+  assert.equal(documentFetches, 2);
 });
