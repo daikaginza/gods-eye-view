@@ -246,7 +246,12 @@ export function capProxy({
       );
       const alerts = state.ingest(parsed);
       lastAttemptAt = now();
-      if (successfulSources > 0 || !loaded) {
+      // Never turn a cold total upstream outage into a cached empty
+      // "success". With no last-good snapshot, the next request should get a
+      // fresh chance to acquire one; concurrent callers are still coalesced by
+      // refreshPromise. An intentionally disabled/empty catalogue is a valid
+      // empty snapshot and may be cached.
+      if (successfulSources > 0 || !enabled || queue.length === 0) {
         generatedAt = new Date(lastAttemptAt).toISOString();
         loaded = true;
       }
