@@ -3,6 +3,7 @@ import { ShellFacade } from './shellFacade.js';
 import { AircraftDisplay } from './aircraftDisplay.js';
 import { LayerBindings } from './layerBindings.js';
 import { PanelChrome } from './panelChrome.js';
+import { initMobileShell } from './mobileShell.js';
 import { VisualSettings } from './visualSettings.js';
 import { NavigationController } from './navigationController.js';
 import { ShareRestoration } from './shareRestoration.js';
@@ -15,6 +16,7 @@ import { readShellElements } from './shellElements.js';
 import { CockpitCoordinator } from './cockpitCoordinator.js';
 import { ContextControls } from './context.js';
 import { CctvControls } from './cctv.js';
+import { StreetLevelControls } from './streetLevelControls.js';
 import { RadioControls } from './radio.js';
 import { LocalSdrControls } from './localSdrControls.js';
 import { LocationNavigation } from './locationNavigation.js';
@@ -36,14 +38,23 @@ import { ShellFeedback } from './shellFeedback.js';
 
 import { runCctvLayerEnableTransition } from '../cctvFocusPolicy.js';
 
+import {
+  describeUnsavedWork,
+  getLocale,
+  msg,
+  persistLocaleAndReload,
+  registerUnsavedWork,
+  t,
+} from '../i18n/index.js';
+import { applyLocaleChoice, mountLocalePicker } from './localePicker.js';
+
 /**
  * Central UI orchestrator for the God's Eye View application.
  *
  * Responsibilities:
  * - Visual controls and presets backed by the VisualEffects controller.
  * - Bloom and sharpen post-processing toggle/intensity control.
- * - Draggable/collapsible panel system with localStorage persistence,
- *   z-order stacking, and viewport-clamped positioning.
+ * - Collapsible rail panels with their collapsed state kept in localStorage.
  * - CCTV panel: camera selection, coverage toggle, projection, calibration
  *   sliders, auto-hop, and summary typewriter effect.
  * - Location bar with city/POI preset pills, QWERTY key navigation,
@@ -114,6 +125,8 @@ export class StyleManager extends ShellFacade {
       readInitialShare: () => this._initialShareState,
       readScrollRestoreOwner: () => this._displayPortalScrollRestoreOwner,
       readDisplayScrollTop: () => this._standardDisplayScrollTop,
+      readSharedCollapsed: (panelId) =>
+        this._mobileShell?.sharedCollapsed(panelId),
     });
     this._feedback = new ShellFeedback({
       readLayers: () => this._dataManager?.getAll?.() || [],
@@ -263,6 +276,7 @@ export class StyleManager extends ShellFacade {
         _contextControls: this._contextControls,
         _cctvControls: this._cctvControls,
         _radioControls: this._radioControls,
+        _streetLevelControls: this._streetLevelControls,
       }),
       operations: {
         _updateTrafficSyncChip: (...args) =>
@@ -564,13 +578,19 @@ export class StyleManager extends ShellFacade {
     });
     this._initUI();
     this._initMapStackControl();
+    // Headers first: panel chrome builds its toggle labels from them.
+    this._applyRuntimeStaticHeaderText();
     this._initPanelChrome();
+    this._initLocaleSelector();
+    this._sizeDisplayLabelColumn();
     this._initLeftPanelAdaptiveLayout();
     this._initRightPanelAdaptiveLayout();
     this._initRadioPanel();
     this._initCctvPanel();
+    this._initStreetLevelPanel();
     this._initGlobalContextPanel();
     this._initLocationBar();
+    this._initMobileShell();
     this._initShareButton();
     this._initCameraOrientationControls();
     this._initClearSelectedLayersButton();
@@ -698,6 +718,154 @@ export class StyleManager extends ShellFacade {
   }
 
   /**
+   * Mounts the language picker (src/ui/localePicker.js). A choice reloads the
+   * page; _confirmLocaleReload asks first when that would lose work.
+   * @returns {void}
+   */
+  _initLocaleSelector() {
+    // Work this shell can see that a reload drops. Other modules register
+    // their own (registerUnsavedWork in src/i18n/index.js).
+    this._unsavedWorkChecks = [
+      registerUnsavedWork(() =>
+        this.services?.cctvLayer
+          ?.getUIState?.()
+          ?.cameras?.some((camera) => camera.calDirty)
+          ? msg('unsaved CCTV calibration')
+          : null,
+      ),
+      registerUnsavedWork(() =>
+        this.cockpitView?.active ? msg('the open cockpit') : null,
+      ),
+    ];
+    const root = globalThis.document?.getElementById?.('locale-picker');
+    if (!root) return;
+    this._localePicker = mountLocalePicker({
+      root,
+      current: getLocale(),
+      onSelect: (locale) => this._chooseLocale(locale),
+    });
+  }
+
+  /**
+   * Switch to `locale`: nothing for the active language, otherwise store it
+   * and reload once _confirmLocaleReload agrees.
+   * @param {string} locale
+   * @returns {'unchanged'|'declined'|'switched'}
+   */
+  _chooseLocale(locale) {
+    return applyLocaleChoice(locale, {
+      current: getLocale(),
+      confirmSwitch: () => this._confirmLocaleReload(),
+      switchLocale: (next) => persistLocaleAndReload(next),
+    });
+  }
+
+  /**
+   * Switching language reloads the page. While that would lose work the page
+   * cannot restore, ask first.
+   * @returns {boolean} true to switch.
+   */
+  _confirmLocaleReload() {
+    const lost = describeUnsavedWork();
+    if (!lost.length || typeof globalThis.confirm !== 'function') return true;
+    return globalThis.confirm(
+      t(
+        'Switching language reloads the page. This will be lost: {items}. Switch anyway?',
+        { items: lost.join(', ') },
+      ),
+    );
+  }
+
+  /**
+   * Sizes one Display-panel label column to the longest label in the active
+   * language, so slider tracks line up. Counts characters (labels are
+   * monospace and often hidden); CSS turns the count into a width.
+   * @returns {void}
+   */
+  _sizeDisplayLabelColumn() {
+    const labels = document.querySelectorAll(
+      '#pp-toggles .pp-slider-row > .pp-slider-mini-label',
+    );
+    let longest = 0;
+    for (const label of labels) {
+      longest = Math.max(longest, label.textContent.trim().length);
+    }
+    if (longest > 0) {
+      document.documentElement.style.setProperty(
+        '--pp-label-chars',
+        String(longest),
+      );
+    }
+  }
+
+  /**
+   * Rewrites a header's last text node, keeping the leading icon span that a
+   * textContent write would destroy.
+   * @param {Element|null} element
+   * @param {string} text
+   * @returns {void}
+   */
+  _setHeaderText(element, text) {
+    if (!element) return;
+    const textNode = Array.from(element.childNodes)
+      .reverse()
+      .find(
+        (node) => node.nodeType === Node.TEXT_NODE && node.nodeValue?.trim(),
+      );
+    if (textNode) textNode.nodeValue = text;
+    else element.textContent = text;
+  }
+
+  /**
+   * Translates at boot the header texts that share their element with an
+   * icon or a <br> (data-i18n-runtime in the templates).
+   * @returns {void}
+   */
+  _applyRuntimeStaticHeaderText() {
+    this._setHeaderText(
+      document.querySelector('#control-panel .panel-title'),
+      t('VISUAL PRESETS'),
+    );
+    this._setHeaderText(
+      document.querySelector('#location-bar .location-toolbar-label'),
+      t('LOCATION'),
+    );
+    // One span holds both mode descriptions around a <br>; keep the <br>.
+    const standbyDescription = document.querySelector(
+      '#context-mode-standby span',
+    );
+    if (standbyDescription) {
+      standbyDescription.replaceChildren(
+        document.createTextNode(
+          t('CONTACTS — nearest planes · vessels · sites'),
+        ),
+        document.createElement('br'),
+        document.createTextNode(
+          t('SPACE MISSIONS — launches & orbital assets'),
+        ),
+      );
+    }
+    // Leading space after the live dot, as showBriefPage writes it.
+    const briefKicker = document.querySelector('#cockpit-brief-kicker');
+    if (briefKicker) {
+      this._setHeaderText(briefKicker, ` ${t('LIVE SIGNALS')}`);
+    }
+  }
+
+  /**
+   * Phone layout: a bottom tab bar presenting one panel sheet at a time
+   * (src/ui/mobileShell.js). Inactive above 720px.
+   * @returns {void}
+   */
+  _initMobileShell() {
+    this._mobileShell = initMobileShell({
+      setPanelCollapsed: (panelId, collapsed, options) =>
+        this._panelChrome.setPanelCollapsed(panelId, collapsed, options),
+      onSheetsClosed: () => this._syncShareState(),
+    });
+  }
+
+  /**
    * Renders the owner-approved map stack chip row from the matching controller
    * entries. Cesium ion/Bing chips remain keyboard-focusable but unavailable,
    * with an accessible explanation, until a CESIUM_ION_TOKEN is configured.
@@ -705,6 +873,7 @@ export class StyleManager extends ShellFacade {
    */
   _initMapStackControl() {
     if (!this.mapStackController) return;
+
     this._mapSourceControls?.destroy();
     this._mapSourceControls = createMapSourceControls({
       container: this._mapStackChips,
@@ -930,6 +1099,43 @@ export class StyleManager extends ShellFacade {
     return this._runExplicitNavigation('camera', () => focus(cameraId));
   }
 
+  /** Compose the Street Level panel controls from its layer and application actions. */
+  _initStreetLevelPanel() {
+    const { streetLevelLayer } = this.services;
+    this._streetLevelControls?.destroy();
+    this._streetLevelControls = null;
+    if (!this._streetLevelPanel || !streetLevelLayer) return;
+    // Photo framing yields to newer navigation and releases tracking like
+    // any deferred flight.
+    streetLevelLayer.attachNavigation?.({
+      begin: (noun) => this._beginDeferredNavigation(noun),
+      reassert: (generation) => this._reassertNavigationHandoff(generation),
+    });
+    this._streetLevelControls = new StreetLevelControls({
+      root: this._streetLevelPanel,
+      layer: streetLevelLayer,
+      actions: {
+        isEnabled: () => this._dataManager?.isEnabled('street-level') === true,
+        setEnabled: (enabled) =>
+          this._dataManager?.setEnabled('street-level', enabled, {
+            origin: 'user',
+          }),
+        setParams: (params, options) =>
+          this._dataManager?.setLayerParams('street-level', params, options),
+        setPanelCollapsed: (collapsed, options) =>
+          this.setPanelCollapsed('street-level-panel', collapsed, options),
+        showToast: (message) => this._showToast(message),
+        // Lets the panel open for a user, voice or tool switch-on, not a restore.
+        subscribeEnableRequests: (listener) =>
+          this._dataManager?.subscribeVisibilityRequests?.((change) => {
+            if (change?.layerId === 'street-level' && change.enabled)
+              listener(change.origin);
+          }) || null,
+      },
+    });
+    this._streetLevelControls.connect();
+  }
+
   /** Compose camera panel controls from the existing camera port and application actions. */
   _initCctvPanel() {
     const { cctvLayer } = this.services;
@@ -986,7 +1192,7 @@ export class StyleManager extends ShellFacade {
     const { cctvLayer } = this.services;
     if (this._disposed) return false;
     if (!this._dataManager || !this._dataManager.layers?.has('cctv')) {
-      this._showToast('CCTV layer unavailable');
+      this._showToast(t('CCTV layer unavailable'));
       return false;
     }
     const enabled = this._dataManager.isEnabled('cctv');
@@ -1013,19 +1219,6 @@ export class StyleManager extends ShellFacade {
     });
     return true;
   }
-
-  /**
-   * Makes a panel draggable via its handle element. Implements:
-   * - Z-order promotion: each pointerdown increments the global z-counter
-   *   so the clicked panel floats above siblings.
-   * - Viewport clamping: drag moves are clamped to a 6px inset from all edges.
-   * - Right-rail pinning: pp-toggles panel is re-anchored right after drag.
-   * - CCTV viewport sync: cctv-panel recalculates scroll height after drag.
-   * @param {string} panelId - DOM id of the panel.
-   * @param {HTMLElement} panelEl - The panel DOM element.
-   * @param {HTMLElement} handleEl - The drag handle element within the panel.
-   * @returns {void}
-   */
 
   /**
    * Programmatically collapses or expands a panel, persists the state,
@@ -1359,6 +1552,8 @@ export class StyleManager extends ShellFacade {
    * @param {string} styleName - Target style ('normal'|'retro'|'surveillance'|'thermal'|'anime'|'noir'|'snow').
    * @param {object} [options]
    * @param {boolean} [options.applyPreset=true] - Whether to apply STYLE_PRESET_DEFAULTS for the new style.
+   * @param {boolean} [options.userInitiated=false] - Whether a direct user preset choice owns the Cyber exit style.
+   * @param {boolean} [options.preserveCyberRestore=false] - Whether an automatic style update keeps the Cyber entry snapshot.
    * @returns {void}
    */
   setStyle(
@@ -1433,7 +1628,7 @@ export class StyleManager extends ShellFacade {
     this._lifetime.listen(this._shareBtn, 'click', async () => {
       const success = await this.shareLinkManager.copyLink();
       if (!this._disposed)
-        this._showToast(success ? 'Link copied!' : 'Copy failed');
+        this._showToast(success ? t('Link copied!') : t('Copy failed'));
     });
   }
 
@@ -1524,7 +1719,12 @@ export class StyleManager extends ShellFacade {
     this._shareState.destroy();
     this._locationNavigation.destroy();
     this._lifetime.destroy();
+    for (const unregister of this._unsavedWorkChecks?.splice(0) ?? [])
+      unregister();
+    this._localePicker?.destroy();
+    this._localePicker = null;
     this._recording.destroy();
+    this._mobileShell?.destroy();
     this._panelChrome.destroy();
     this._feedback.destroy();
 
@@ -1533,6 +1733,8 @@ export class StyleManager extends ShellFacade {
     this._cameraOrientationControls?.destroy();
     this._clearLayersControl?.destroy();
     this._cctvControls?.destroy();
+    this.services?.streetLevelLayer?.attachNavigation?.(null);
+    this._streetLevelControls?.destroy();
     this._radioControls?.destroy();
     this._localSdrControls?.destroy();
     this._cockpitCoordinator.stop();

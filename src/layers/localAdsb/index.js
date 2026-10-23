@@ -36,18 +36,8 @@ import {
 } from './policy.js';
 import { localAdsbStatus } from './status.js';
 
-export {
-  LAYER_ID as LOCAL_ADSB_LAYER_ID,
-  HEARD_BY_RECEIVER,
-} from './policy.js';
-export {
-  localAdsbCardModel,
-  localAdsbClassLine,
-  localAdsbIsUat,
-  localAdsbReceiverLine,
-  localAdsbTitle,
-} from './card.js';
-export { localAdsbClass } from './enrichment.js';
+export { HEARD_BY_RECEIVER } from './policy.js';
+export { localAdsbCardModel, localAdsbReceiverLine } from './card.js';
 export { localAdsbStatus } from './status.js';
 
 const FEET_TO_METERS = 0.3048;
@@ -826,6 +816,40 @@ export function createLocalAdsbLayer({
      */
     selectAircraft(icao) {
       return enabled && selectMarker(`${ENTITY_PREFIX}${icao}`);
+    },
+
+    /**
+     * Snapshot loaded locally received aircraft as plain JSON-safe records for the analyst
+     * query engine. On demand only (once per spoken query); [] while the
+     * layer is off.
+     * @param {number} [maxCount=Infinity] Most records to return.
+     * @returns {Array<Object>} {id, icao24, callsign, lat, lon, altitudeM, speedKts, heading, onGround}.
+     */
+    getAnalystRecords(maxCount = Infinity) {
+      if (!enabled) return [];
+      const num = (v) => (Number.isFinite(v) ? v : null);
+      const result = [];
+      for (const marker of markers.values()) {
+        if (result.length >= maxCount) break;
+        const record = marker.record || {};
+        const lat = marker.lat ?? record.lat;
+        const lon = marker.lon ?? record.lon;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        result.push({
+          id: record.callsign || record.icao,
+          icao24: record.icao || null,
+          callsign: record.callsign || null,
+          lat,
+          lon,
+          altitudeM: Number.isFinite(record.altitudeFt)
+            ? Math.round(record.altitudeFt * 0.3048)
+            : null,
+          speedKts: num(record.groundSpeedKt),
+          heading: num(record.trackDeg),
+          onGround: record.onGround === true,
+        });
+      }
+      return result;
     },
 
     getAllPositions(maxCount = 500) {

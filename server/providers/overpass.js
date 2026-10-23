@@ -1,8 +1,10 @@
 import { makeRateLimiter, clientKey } from './common/rate-limit.js';
 import { readRequestBodyCapped } from './common/request.js';
+import { admitSameSite } from './common/same-site.js';
 import {
   OVERPASS_MAX_BODY_BYTES,
   OVERPASS_MAX_CONCURRENT,
+  resolveOverpassUpstreams,
 } from './overpass/constants.js';
 import { sanitizeOverpassBody } from './overpass/query.js';
 import {
@@ -17,6 +19,7 @@ import {
 import {
   overpassPayloadIsData,
   fetchOverpassPayload,
+  overpassNotConfigured,
 } from './overpass/transport.js';
 import { installRouteMiddleware } from './places/routes.js';
 
@@ -24,6 +27,14 @@ import { installRouteMiddleware } from './places/routes.js';
 const _overpassInFlight = new Map();
 
 let _overpassConcurrent = 0;
+
+// Bound body-reading and validation work, including malformed requests and
+// cache hits. Keep the tighter upstream budget below independent of this gate.
+const _overpassRequestLimiter = makeRateLimiter({
+  windowMs: 60_000,
+  max: 300,
+  globalMax: 900,
+});
 
 const _overpassRateLimiter = makeRateLimiter({
   windowMs: 60_000,
@@ -41,9 +52,16 @@ const _overpassRateLimiter = makeRateLimiter({
 function sendOverpassResponse(res, payload, cacheStatus = 'MISS') {
   res.writeHead(payload.status, {
     'Content-Type': payload.contentType || 'application/json',
-    'Cache-Control': 'public, max-age=15',
+    'Cache-Control': overpassPayloadIsData(payload)
+      ? 'public, max-age=15'
+      : 'no-store',
     'X-Overpass-Cache': cacheStatus,
-    'X-Overpass-Upstream': payload.endpoint || 'unknown',
+    ...(Number.isFinite(payload.cachedAt)
+      ? { 'X-Overpass-Cached-At': new Date(payload.cachedAt).toISOString() }
+      : {}),
+    ...(payload.retryAfterMs
+      ? { 'Retry-After': String(Math.ceil(payload.retryAfterMs / 1000)) }
+      : {}),
   });
   res.end(payload.body || '');
 }
@@ -52,7 +70,7 @@ function sendOverpassResponse(res, payload, cacheStatus = 'MISS') {
  * Vite plugin: Overpass API proxy with response caching and request coalescing.
  *
  * Accepts POST requests at /api/overpass, normalizes the query body for
- * cache keying, and fans out to multiple Overpass mirrors with per-upstream
+ * cache keying, and uses only operator-configured endpoints with per-upstream
  * timeout and rate-limit detection. Successful responses are cached for
  * OVERPASS_CACHE_MS. Concurrent identical queries share a single upstream
  * request via the in-flight map.
@@ -66,9 +84,33 @@ function overpassProxy({ routing = {} } = {}) {
       // (a body-read failure would otherwise hit an out-of-scope reference).
       let cacheKey = null;
       try {
+        // Capability probe: lets clients skip queries when nothing is configured.
+        if (req.method === 'GET' && req.url?.split('?')[0] === '/status') {
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          });
+          res.end(
+            JSON.stringify({
+              configured: resolveOverpassUpstreams().length > 0,
+            }),
+          );
+          return;
+        }
         if (req.method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        if (admitSameSite(req, res)) return;
+        if (!_overpassRequestLimiter(clientKey(req))) {
+          res.writeHead(429, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+            'Retry-After': '60',
+          });
+          res.end(JSON.stringify({ error: 'Rate limit exceeded' }));
           return;
         }
 
@@ -104,12 +146,21 @@ function overpassProxy({ routing = {} } = {}) {
 
         // Normalize whitespace so semantically identical Overpass QL queries share cache entries
         cacheKey = safeBody.replace(/\s+/g, ' ').trim();
+        if (!resolveOverpassUpstreams().length) {
+          const cached = await readStaleOverpass(cacheKey);
+          sendOverpassResponse(
+            res,
+            cached || overpassNotConfigured(),
+            cached ? 'STALE' : 'DISABLED',
+          );
+          return;
+        }
         const preflight = await resolveOverpassPreflight({
           cacheKey,
           memoryCache: _overpassCache,
           inFlight: _overpassInFlight,
-          // Fresh-enough disk entries survive restarts and skip the public
-          // mirrors; boundary-class queries keep their month-long TTL.
+          // Fresh-enough disk entries survive restarts and skip upstream
+          // requests; boundary-class queries keep their month-long TTL.
           readDisk: () =>
             readOverpassDisk(cacheKey, overpassDiskTtlMs(cacheKey)),
           allowUpstream: () => _overpassRateLimiter(clientKey(req)),
@@ -194,7 +245,7 @@ function overpassProxy({ routing = {} } = {}) {
           sendOverpassResponse(res, stale, 'STALE');
           return;
         }
-        console.error('[Overpass Proxy]', e.message);
+        console.error('[Overpass Proxy] request failed');
         res.writeHead(502, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Overpass proxy error' }));
       }

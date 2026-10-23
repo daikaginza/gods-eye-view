@@ -1,8 +1,10 @@
 import * as Cesium from 'cesium';
 import { horizonOccluder } from '../../data/iconOrientation.js';
+import { isHeadingEstimated } from './headingConfidence.js';
 import {
   ACTIVE_CAMERA_COLOR,
   IDLE_CAMERA_COLOR,
+  LIVE_CAMERA_COLOR,
   ACTIVE_COVERAGE_CENTER,
   IDLE_COVERAGE_CENTER_MUTED,
   ACTIVE_COVERAGE_CENTER_DEPTHFAIL,
@@ -17,6 +19,15 @@ export function createRendering({
   parts,
   source,
 }) {
+  /** Icon color: active wins, then live-capable video feeds, then idle stills. */
+  function cameraColorFor(record) {
+    if (record.camera.id === layerState._activeCameraId)
+      return ACTIVE_CAMERA_COLOR;
+    if (parts.model.isVideoFeedType(record.camera.feedType))
+      return LIVE_CAMERA_COLOR;
+    return IDLE_CAMERA_COLOR;
+  }
+
   const {
     focusNowMs,
     getFocusTarget,
@@ -57,10 +68,7 @@ export function createRendering({
         ),
       cameraDistanceFor: (position) =>
         Cesium.Cartesian3.distance(camera.positionWC, position),
-      baseColorFor: (record) =>
-        record.camera.id === layerState._activeCameraId
-          ? ACTIVE_CAMERA_COLOR
-          : IDLE_CAMERA_COLOR,
+      baseColorFor: cameraColorFor,
     });
     layerState._activeFocusStyleCount = result.activeCount;
   }
@@ -207,9 +215,7 @@ export function createRendering({
     for (const record of layerState._records) {
       const isActive = record.camera.id === activeId;
       if (record.billboard) {
-        record.billboard.color = isActive
-          ? ACTIVE_CAMERA_COLOR
-          : IDLE_CAMERA_COLOR;
+        record.billboard.color = cameraColorFor(record);
         record.billboard.scale = isActive ? 1.25 : 1.0;
         // disableDepthTestDistance stays POSITIVE_INFINITY for every billboard
         // (set at creation) — see the field-test far-zoom submerge fix there.
@@ -233,6 +239,15 @@ export function createRendering({
       );
 
       const inVisibleSet = coverageVisible.has(record.camera.id);
+      // A synthetic bearing (headingConfidence 'low', no human calibration)
+      // draws its wireframe dashed so a guessed facing is visibly provisional
+      // rather than rendering identically to a surveyed one (#639). Colors,
+      // widths, and the active/idle emphasis are unchanged.
+      const bearingEstimated = isHeadingEstimated(record.camera);
+      const lineMaterial = (color) =>
+        bearingEstimated
+          ? new Cesium.PolylineDashMaterialProperty({ color })
+          : color;
       for (const entity of record.coverageEntities || []) {
         // The frustum wireframe is part of the projection representation —
         // force it on for the active camera and let it read through geometry
@@ -247,13 +262,15 @@ export function createRendering({
         // active camera keeps its width/alpha emphasis in both schemes.
         const hue = viewshedOn ? record.viewshedColors : null;
         if (entity._coverageRole === 'cap') {
-          entity.polyline.material = hue
-            ? isActive
-              ? hue.lineActive
-              : hue.line
-            : isActive
-              ? ACTIVE_COVERAGE_CENTER
-              : IDLE_COVERAGE_CENTER_MUTED;
+          entity.polyline.material = lineMaterial(
+            hue
+              ? isActive
+                ? hue.lineActive
+                : hue.line
+              : isActive
+                ? ACTIVE_COVERAGE_CENTER
+                : IDLE_COVERAGE_CENTER_MUTED,
+          );
           entity.polyline.width = isActive ? 2.2 : 1.0;
           entity.polyline.depthFailMaterial = planeShowing
             ? hue
@@ -261,13 +278,15 @@ export function createRendering({
               : ACTIVE_COVERAGE_CENTER_DEPTHFAIL
             : undefined;
         } else {
-          entity.polyline.material = hue
-            ? isActive
-              ? hue.lineActive
-              : hue.line.withAlpha(0.6)
-            : isActive
-              ? ACTIVE_COVERAGE_EDGE
-              : IDLE_COVERAGE_EDGE_MUTED;
+          entity.polyline.material = lineMaterial(
+            hue
+              ? isActive
+                ? hue.lineActive
+                : hue.line.withAlpha(0.6)
+              : isActive
+                ? ACTIVE_COVERAGE_EDGE
+                : IDLE_COVERAGE_EDGE_MUTED,
+          );
           entity.polyline.width = isActive ? 1.8 : 0.9;
           entity.polyline.depthFailMaterial = planeShowing
             ? hue

@@ -21,7 +21,7 @@ test('Display uses an inner scroll body only in Cyber', () => {
 });
 
 test('Cyber restores one expanded owner, keeps launchers, and restores other theme preferences', () => {
-  for (const mobile of [false, true]) {
+  for (const mobile of [false]) {
     const f = fixture('right', {
       mobile,
       hud: { visible: true, variant: 'cyber' },
@@ -48,6 +48,22 @@ test('Cyber restores one expanded owner, keeps launchers, and restores other the
     );
     assert.equal(f.second.classList.contains('collapsed'), false);
   }
+});
+
+test('Cyber keeps no accordion on phones, where the rail is presented as tab sheets', () => {
+  // A sheet (for example Cameras: CCTV with Street Level) shows several of the
+  // rail's panels at once; the accordion would collapse all but one.
+  const f = fixture('right', {
+    mobile: true,
+    hud: { visible: true, variant: 'cyber' },
+  });
+  f.expand(f.first, 250);
+  f.expand(f.second, 250);
+  f.options.preferredPanelId = f.second.id;
+  f.run();
+  assert.equal(f.first.classList.contains('collapsed'), false);
+  assert.equal(f.first.classList.contains('cyber-accordion-collapsed'), false);
+  assert.equal(f.second.classList.contains('collapsed'), false);
 });
 
 test('Cyber restored accordion prefers keyboard focus when no explicit owner exists', () => {
@@ -330,6 +346,54 @@ test('right rail aligns to the current left rail and excludes hidden obstacles',
   f.options.obstacles = [hidden];
   f.run();
   assert.equal(f.stack.dataset.safeTop, '200.0');
+});
+
+// The left rail's `top` animates after the right pass runs, and nothing
+// re-runs it when the transition lands: the right rail must read the end value.
+function animatingLeftRail({ keyframes = true } = {}) {
+  const f = fixture('right');
+  const left = f.options.leftStack;
+  left.rect.top = 250;
+  left.computed.top = '250px';
+  left.dataset.safeTopPct = '29.60';
+  left.getAnimations = () => [
+    { transitionProperty: 'bottom', effect: null },
+    {
+      transitionProperty: 'top',
+      effect: {
+        getKeyframes: () =>
+          keyframes ? [{ top: '234px' }, { top: '266.4px' }] : [],
+      },
+    },
+  ];
+  return f;
+}
+
+test('right rail aligns to where a mid-transition left rail settles', () => {
+  const f = animatingLeftRail();
+  f.run();
+  assert.equal(f.stack.dataset.safeTop, '266.4');
+  assert.equal(
+    f.stack.style.getPropertyValue('--right-stack-safe-top'),
+    '266.4px',
+  );
+});
+
+test('right rail falls back to the committed left target when the transition end is unreadable', () => {
+  const f = animatingLeftRail({ keyframes: false });
+  f.run();
+  assert.equal(f.stack.dataset.safeTop, '266.4');
+});
+
+test('right rail follows a settled left rail whose CSS overrides the committed target', () => {
+  // Cyber pins the left rail with `top: ... !important`, so the committed
+  // percentage is not where it renders and no `top` transition runs.
+  const f = fixture('right', { hud: { visible: true, variant: 'cyber' } });
+  f.options.leftStack.rect.top = 220;
+  f.options.leftStack.dataset.safeTopPct = '26.00';
+  f.options.leftStack.getAnimations = () => [];
+  f.run();
+  assert.equal(f.stack.dataset.safeTop, '220.0');
 });
 
 test('natural height includes visible content, margins and wrapper chrome, excluding hidden rows', () => {
@@ -629,6 +693,51 @@ test('narrow-screen rails pin every hosted panel glow inside its panel box', () 
       `${rail} scrolls at ≤720px but does not pin its panel glows (inset: 0)`,
     );
   }
+});
+
+test('right layout ignores a CSS-hidden expanded panel when deciding exclusivity', () => {
+  const f = fixture('right');
+  const weather = element('weather-panel', { height: 300 });
+  weather.computed.display = 'none';
+  f.stack.children.push(weather);
+  weather.parentElement = f.stack;
+
+  f.run();
+
+  assert.equal(f.stack.classList.contains('layout-exclusive'), false);
+  assert.equal(f.stack.dataset.expandedCount, '0');
+  assert.equal(f.first.getAttribute('aria-hidden'), undefined);
+  assert.equal(f.second.getAttribute('aria-hidden'), undefined);
+  assert.equal(
+    weather.style.getPropertyValue('--right-panel-allocated-height'),
+    '',
+  );
+});
+
+test('right layout still restores panels that exclusive presentation hides', () => {
+  const f = fixture('right');
+  // Model layers.css: an exclusive rail hides its collapsed panels.
+  f.options.windowRef.getComputedStyle = (node) => ({
+    ...node.computed,
+    display:
+      f.stack.classList.contains('layout-exclusive') &&
+      node.classList.contains('collapsed')
+        ? 'none'
+        : node.computed.display,
+  });
+  f.expand(f.first, 250);
+  f.second.classList.add('layout-auto-collapsed');
+  f.stack.classList.add('layout-exclusive');
+
+  f.run();
+  assert.equal(f.stack.classList.contains('layout-exclusive'), true);
+  assert.equal(f.second.getAttribute('aria-hidden'), 'true');
+
+  f.options.hud.visible = false;
+  f.run();
+  assert.equal(f.second.classList.contains('collapsed'), false);
+  assert.equal(f.second.classList.contains('layout-auto-collapsed'), false);
+  assert.deepEqual(f.collapsed, ['second']);
 });
 
 test('right layout ignores a hidden panel: no lane, no gap, no auto-collapse', () => {

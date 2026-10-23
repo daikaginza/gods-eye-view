@@ -12,6 +12,28 @@ import { displayPanelScroller } from './displayPanelScroll.js';
 const pendingCollapseRetries = new WeakSet();
 
 /**
+ * Where the left rail's top will settle, not where it is mid-transition:
+ * nothing re-runs this pass when the `top` animation ends (ResizeObserver
+ * ignores moves). Returns NaN when there is no left rail.
+ */
+function settledLeftRailTop(leftStack, viewportHeight, getComputedStyle) {
+  const top = leftStack?.getBoundingClientRect().top;
+  if (!Number.isFinite(top)) return NaN;
+  const transition = leftStack
+    .getAnimations?.()
+    .find((animation) => animation.transitionProperty === 'top');
+  if (!transition) return top;
+  const keyframes = transition.effect?.getKeyframes?.() || [];
+  const targetTop = parseFloat(keyframes.at(-1)?.top);
+  const currentTop = parseFloat(getComputedStyle(leftStack).top);
+  // The rect and the computed `top` move together; keep any offset between them.
+  if (Number.isFinite(targetTop) && Number.isFinite(currentTop))
+    return top + targetTop - currentTop;
+  const targetPct = parseFloat(leftStack.dataset?.safeTopPct);
+  return Number.isFinite(targetPct) ? (targetPct * viewportHeight) / 100 : top;
+}
+
+/**
  * Measure and place the right panel rail for one synchronous layout pass.
  * The caller owns scheduling, obstacle selection, disclosure preferences and
  * persistence. Auto-collapse is presentation only and reports through callbacks.
@@ -47,8 +69,17 @@ export function layoutRightPanelRail({
   // A collapse may schedule one follow-up, which only measures and allocates.
   const isCollapseRetry = pendingCollapseRetries.delete(stack);
 
+  // Other CSS may hide a panel, such as an event view: it is not laid out.
+  // Exclusive presentation hides collapsed panels itself; those stay in the
+  // rail so they can be restored.
+  const hiddenByRail = (panel) =>
+    stack.classList.contains('layout-exclusive') &&
+    panel.classList.contains('collapsed');
   const panels = [...stack.children].filter(
-    (panel) => panel.matches('[data-panel-id]') && !panel.hidden,
+    (panel) =>
+      panel.matches('[data-panel-id]') &&
+      !panel.hidden &&
+      (hiddenByRail(panel) || getComputedStyle(panel).display !== 'none'),
   );
   if (!hud.visible || hud.variant !== 'tactical') {
     for (const panel of panels.filter((item) =>
@@ -60,7 +91,9 @@ export function layoutRightPanelRail({
   }
   // Normalize restored state and theme entry without overwriting saved panel
   // preferences. This marker is distinct from Tactical's space-based collapse.
-  if (hud.variant === 'cyber') {
+  // Phones present the rail as tab sheets that show several panels at once.
+  const isMobile = windowRef.matchMedia('(max-width: 720px)').matches;
+  if (hud.variant === 'cyber' && !isMobile) {
     const expanded = panels.filter(
       (panel) => !panel.classList.contains('collapsed'),
     );
@@ -80,16 +113,19 @@ export function layoutRightPanelRail({
       onCollapse(panel);
     }
   }
-  const isMobile = windowRef.matchMedia('(max-width: 720px)').matches;
   const hasExpandedPanel = panels.some(
     (panel) =>
       !panel.classList.contains('collapsed') &&
       (!isMobile || panel.id !== 'pp-toggles'),
   );
-  const exclusive = shouldHideCollapsedRightPanels({
-    hudVariant: hud.variant,
-    hasExpandedPanel,
-  });
+  // Phones present the rail as tab sheets (mobileShell.js), which choose what
+  // shows; hiding collapsed siblings would empty a sheet and its a11y tree.
+  const exclusive =
+    !isMobile &&
+    shouldHideCollapsedRightPanels({
+      hudVariant: hud.variant,
+      hasExpandedPanel,
+    });
   stack.classList.toggle('layout-exclusive', exclusive);
   for (const panel of panels) {
     if (exclusive && panel.classList.contains('collapsed'))
@@ -110,7 +146,11 @@ export function layoutRightPanelRail({
   const viewportHeight = Math.max(1, windowRef.innerHeight);
   const safeGap = Math.max(8, viewportHeight * 0.012);
   const stackRect = stack.getBoundingClientRect();
-  const leftStackTop = leftStack?.getBoundingClientRect().top;
+  const leftStackTop = settledLeftRailTop(
+    leftStack,
+    viewportHeight,
+    getComputedStyle,
+  );
   const alignedTop = Number.isFinite(leftStackTop)
     ? leftStackTop
     : viewportHeight * 0.26;

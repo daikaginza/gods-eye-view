@@ -36,6 +36,7 @@ import {
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './qa-chrome.mjs';
 import { createTransitHistory } from '../server/providers/transitHistory.js';
 import { DETECTION_THEME_MAP } from '../src/overlays/worldOverlayTokens.js';
 import { transitModeTier } from '../src/data/transitPresetStyle.js';
@@ -46,8 +47,6 @@ import {
   reduceScenario,
   reduceSensorContrast,
   reduceScriptedMotion,
-  reduceMotion,
-  reduceFleet,
 } from '../src/layers/transit/qaMetrics.js';
 
 const BASE = process.env.QA_BASE_URL || 'http://localhost:4173';
@@ -262,8 +261,7 @@ await mkdir(SHOTS, { recursive: true });
 const browser = await puppeteer.launch({
   headless: false,
   protocolTimeout: 150000,
-  executablePath:
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: chromeExecutablePath(),
   args: [
     '--no-sandbox',
     '--disable-background-timer-throttling',

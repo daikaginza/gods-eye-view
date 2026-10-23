@@ -1,5 +1,4 @@
 import { readShellSource, shellMethod } from './testSupport/readShellSource.mjs';
-import { StyleManager } from './ui/applicationShell.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +25,7 @@ test('the ACTIVE STYLE indicator is written from the style name and nothing else
   assert.equal(writes.length, 1, 'the style indicator must have exactly one writer');
   assert.match(
     ui.slice(writes[0].index, writes[0].index + 160),
-    /this\._styleIndicator\.textContent =\s*displayNames\[styleName\] \|\| styleName\.toUpperCase\(\);/,
+    /this\._styleIndicator\.textContent = STYLE_STATUS_LABELS\[styleName\]\s*\?\s*t\(STYLE_STATUS_LABELS\[styleName\]\)\s*:\s*styleName\.toUpperCase\(\);/,
   );
 
   const handler = locationSearchHandler();

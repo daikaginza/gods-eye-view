@@ -167,6 +167,13 @@ async function main() {
     page.on('request', (request) => {
       const url = new URL(request.url());
 
+      // Radio QA uses keyless maps; an optional Google token is not offered.
+      if (request.method() === 'GET' && url.origin === APP_ORIGIN
+        && url.pathname === '/api/google/tiles-token') {
+        request.respond({ status: 200, contentType: 'application/json', body: '{}' });
+        return;
+      }
+
     // These scenarios exercise Context lifecycle and keyboard ownership, not
     // live orbit accuracy. Reuse the tracking suite's fixed element sets so
     // CelesTrak outages cannot invalidate an otherwise clean UI run.
@@ -219,7 +226,7 @@ async function main() {
         });
         return;
       }
-      if (url.origin === APP_ORIGIN && url.pathname === '/api/ais-live') {
+      if (url.origin === APP_ORIGIN && url.pathname === '/api/vessels') {
         request.respond({
           status: 200,
           contentType: 'application/json',
@@ -1284,8 +1291,6 @@ async function main() {
     const clusterBadge = await page.evaluate(async () => {
       const viewer = window.__godsEyeView.viewer;
       const { getOverlayPaintRect, getWorldOverlayDiagnostics } = await import('/src/overlays/worldOverlay.js');
-      const { distanceFade } = await import('/src/overlays/worldOverlayDraw.js');
-      const { radioStationIdFromPick } = await import('/src/data/radio.js');
       const baselineSolveRevision = getWorldOverlayDiagnostics().solveRevision;
       const source = Array.from({ length: viewer.dataSources.length }, (_, index) => viewer.dataSources.get(index))
         .find((item) => item.name === 'Radio stations');
