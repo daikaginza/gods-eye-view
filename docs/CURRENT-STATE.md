@@ -1921,6 +1921,35 @@ throws, that source reports failure without a contradictory success entry.
 The existing per-record append continues to support large feeds; sequential
 fetching, trailing-24-hour filtering and partial-success caching are unchanged.
 
+## CAP alerts route
+
+`/api/cap` (dev and preview servers, `server/providers/cap.js`) returns
+`{ source: 'cap', alerts, generatedAt }`: official Common Alerting Protocol
+alerts from a server-side catalog of national publishers. No client layer reads
+it yet. Each alert keeps the CAP fields (identifier, sender, sent, msgType,
+status, info with event, severity, urgency, certainty, headline, onset, expires
+and areas with polygon or circle geometry) plus its `source` URL and `region`.
+
+- Catalog entries carry an explicit format, region and enablement. Disabled
+  entries are enabled only through `CAP_OPT_IN_SOURCES`; `CAP_ENABLED=false`
+  turns the route into an empty snapshot.
+- RSS/Atom feeds are followed only to CAP documents on the feed's own HTTPS host
+  and registered path; redirects are refused. One refresh fetches at most
+  `CAP_MAX_DOCUMENTS` (32) linked documents across all feeds, four sources at a
+  time, each response capped at `CAP_MAX_BYTES` (2 MiB) and `CAP_TIMEOUT_MS`
+  (10 s).
+- The US National Weather Service is read from its GeoJSON alerts API
+  (`api.weather.gov/alerts/active`) in one request with its own 16 MiB cap, so
+  the whole active set arrives without per-alert document fetches.
+- Alerts pass through a lifecycle state: an Update replaces the alert it
+  references (and is kept when that original is no longer listed), a Cancel
+  removes it and keeps it from returning, and an alert past its `expires` is
+  dropped.
+- Refreshes are coalesced and cached for `CAP_CACHE_TTL_MS` (5 minutes); a stale
+  snapshot is served while the next refresh runs in the background. A cold
+  start where every source fails is not cached as an empty success, so the next
+  request tries again.
+
 ## Installations and map-source guidance
 
 - Keyless mapped installations use OpenFreeMap `landuse` military polygons,
