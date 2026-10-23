@@ -1,4 +1,4 @@
-import { parseCap } from '../../src/data/cap.js';
+import { parseCap, parseNwsAlerts } from '../../src/data/cap.js';
 import { createCapState } from '../../src/data/capState.js';
 import { readResponseTextCapped } from './common/http.js';
 
@@ -9,13 +9,7 @@ const envInt = (name, fallback, min = 1) => {
   return Number.isInteger(value) && value >= min ? value : fallback;
 };
 
-const e = (
-  url,
-  region,
-  format,
-  enabled = true,
-  documentPathPrefix = null,
-) => ({
+const e = (url, region, format, enabled = true, documentPathPrefix = null) => ({
   url,
   region,
   format,
@@ -63,13 +57,12 @@ export const CAP_SOURCES = Object.freeze({
     'Guyana',
     'rss',
   ),
-  nws: e(
-    'https://api.weather.gov/alerts/active.atom',
-    'US',
-    'atom',
-    true,
-    '/alerts',
-  ),
+  // One GeoJSON response holds every active alert (~2 MB for ~500 alerts);
+  // the Atom index would need one CAP document fetch per alert.
+  nws: {
+    ...e('https://api.weather.gov/alerts/active', 'US', 'nws-geojson'),
+    maxBytes: 16 * 1024 * 1024,
+  },
   eccc: e('https://weather.gc.ca/rss/warning/', 'Canada', 'catalog', false),
   dwd: e(
     'https://www.dwd.de/DWD/warnungen/cap-feed/en/rss.xml',
@@ -153,7 +146,7 @@ export function capProxy({
   let generatedAt = null;
   let refreshPromise = null;
 
-  const fetchText = async (url, accept, region) => {
+  const fetchText = async (url, accept, region, limit = maxBytes) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -166,11 +159,7 @@ export function capProxy({
         },
       });
       if (!response.ok) throw Error('http');
-      return await readResponseTextCapped(
-        response,
-        maxBytes,
-        controller.signal,
-      );
+      return await readResponseTextCapped(response, limit, controller.signal);
     } finally {
       clearTimeout(timer);
     }
@@ -194,11 +183,26 @@ export function capProxy({
           const [, source] = queue[cursor++];
           if (!source?.url) continue;
           try {
+            const geojson = source.format === 'nws-geojson';
             const body = await fetchText(
               source.url,
-              'application/xml, application/rss+xml, application/atom+xml, text/xml',
+              geojson
+                ? 'application/geo+json'
+                : 'application/xml, application/rss+xml, application/atom+xml, text/xml',
               source.region,
+              source.maxBytes || maxBytes,
             );
+            if (geojson) {
+              parsed.push(
+                ...parseNwsAlerts(body).map((alert) => ({
+                  ...alert,
+                  source: source.url,
+                  region: source.region,
+                })),
+              );
+              successfulSources += 1;
+              continue;
+            }
             successfulSources += 1;
             if (source.format === 'catalog') continue;
             if (source.format === 'cap') {
@@ -212,11 +216,7 @@ export function capProxy({
               );
               continue;
             }
-            const links = extractCapLinks(
-              body,
-              source,
-              remainingDocuments,
-            );
+            const links = extractCapLinks(body, source, remainingDocuments);
             for (const url of links) {
               if (!takeDocument()) break;
               try {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCap } from './cap.js';
+import { parseCap, parseNwsAlerts } from './cap.js';
 import { createCapState } from './capState.js';
 import {
   allowedCapUrl,
@@ -14,7 +14,7 @@ test('catalogue keeps supplied endpoints and formats', () => {
     CAP_SOURCES.inmet.url,
     'https://apiprevmet3.inmet.gov.br/avisos/rss',
   );
-  assert.equal(CAP_SOURCES.nws.format, 'atom');
+  assert.equal(CAP_SOURCES.nws.format, 'nws-geojson');
   assert.equal(CAP_SOURCES['met-norway'].format, 'cap');
 });
 test('pure RSS/Atom link whitelist accepts same path only', () => {
@@ -114,6 +114,34 @@ test('alert then update preserves target identity', () => {
     'a',
   );
 });
+test('update whose original was never seen is served', () => {
+  // A feed of active alerts lists the current Update, not the Alert it
+  // replaced; a cold start must still show it.
+  const s = createCapState();
+  const out = s.ingest([
+    {
+      identifier: 'u',
+      references: 'sender,a,2026-01-01T00:00:00Z',
+      sent: '2026-01-02T00:00:00Z',
+      msgType: 'Update',
+    },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].identifier, 'a');
+  s.ingest([{ identifier: 'c', references: 'sender,a,t', msgType: 'Cancel' }]);
+  assert.equal(
+    s.ingest([
+      {
+        identifier: 'u2',
+        references: 'sender,a,2026-01-01T00:00:00Z',
+        sent: '2026-01-03T00:00:00Z',
+        msgType: 'Update',
+      },
+    ]).length,
+    0,
+    'a cancelled chain stays cancelled',
+  );
+});
 test('cancel prevents resurrection and old versions', () => {
   const s = createCapState();
   s.ingest([
@@ -166,7 +194,6 @@ test('provider uses catalog and tolerates partial failure', async () => {
   assert.equal(JSON.parse(res.body).alerts.length, 1);
 });
 
-
 const capAlert = ({
   identifier,
   sent,
@@ -192,8 +219,11 @@ const runProxy = async (proxy) => {
   return JSON.parse(res.body);
 };
 
-test('NWS Atom links use the registered CAP document path', () => {
-  const source = CAP_SOURCES.nws;
+test('Atom links use the registered CAP document path', () => {
+  const source = {
+    url: 'https://api.weather.gov/alerts/active.atom',
+    documentPathPrefix: '/alerts',
+  };
   assert.deepEqual(
     extractCapLinks(
       '<link href="https://api.weather.gov/alerts/urn:oid:test.cap"/><link href="https://api.weather.gov/alerts-evil/test.cap"/><link href="https://user@api.weather.gov/alerts/test.cap"/>',
@@ -341,4 +371,146 @@ test('document limit is global across RSS sources', async () => {
   });
   await runProxy(proxy);
   assert.equal(documentFetches, 2);
+});
+
+const nwsFeature = (properties, geometry = null) => ({
+  type: 'Feature',
+  geometry,
+  properties: {
+    id: 'urn:oid:1',
+    sender: 'w-nws.webmaster@noaa.gov',
+    sent: '2026-01-02T00:00:00-05:00',
+    messageType: 'Alert',
+    status: 'Actual',
+    scope: 'Public',
+    references: [],
+    language: 'en-US',
+    category: 'Met',
+    event: 'Flood Warning',
+    urgency: 'Immediate',
+    severity: 'Severe',
+    certainty: 'Observed',
+    headline: 'Flood Warning issued',
+    description: 'River above flood stage.',
+    instruction: 'Turn around, do not drown.',
+    onset: '2026-01-02T00:00:00-05:00',
+    expires: '2026-01-03T00:00:00-05:00',
+    areaDesc: 'Polk, IA',
+    geocode: { UGC: ['IAC153'], SAME: ['019153'] },
+    ...properties,
+  },
+});
+
+test('NWS GeoJSON maps to the CAP alert shape', () => {
+  const [alert] = parseNwsAlerts(
+    JSON.stringify({
+      features: [
+        nwsFeature(
+          {
+            messageType: 'Update',
+            references: [
+              {
+                identifier: 'urn:oid:0',
+                sender: 'w-nws.webmaster@noaa.gov',
+                sent: '2026-01-01T00:00:00-05:00',
+              },
+            ],
+          },
+          {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-93.6, 41.5],
+                [-93.5, 41.5],
+                [-93.5, 41.6],
+                [-93.6, 41.5],
+              ],
+            ],
+          },
+        ),
+      ],
+    }),
+  );
+  assert.equal(alert.identifier, 'urn:oid:1');
+  assert.equal(alert.msgType, 'Update');
+  assert.equal(
+    alert.references,
+    'w-nws.webmaster@noaa.gov,urn:oid:0,2026-01-01T00:00:00-05:00',
+  );
+  assert.equal(alert.info[0].event, 'Flood Warning');
+  assert.equal(alert.info[0].severity, 'Severe');
+  assert.equal(alert.info[0].areas[0].description, 'Polk, IA');
+  assert.equal(alert.info[0].areas[0].geocode, 'IAC153');
+  assert.deepEqual(alert.info[0].areas[0].geometry, {
+    type: 'polygon',
+    coordinates: [
+      [41.5, -93.6],
+      [41.5, -93.5],
+      [41.6, -93.5],
+      [41.5, -93.6],
+    ],
+  });
+});
+
+test('NWS GeoJSON rejects bad documents and bad geometry', () => {
+  assert.throws(() => parseNwsAlerts('<html>'));
+  assert.throws(() => parseNwsAlerts('{}'));
+  assert.throws(() =>
+    parseNwsAlerts(JSON.stringify({ features: [{}, {}] }), { maxItems: 1 }),
+  );
+  const [alert] = parseNwsAlerts(
+    JSON.stringify({
+      features: [
+        nwsFeature(
+          {},
+          {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-93.6, 141.5],
+                [-93.5, 41.5],
+                [-93.5, 41.6],
+              ],
+            ],
+          },
+        ),
+        { properties: { event: 'no id' } },
+      ],
+    }),
+  );
+  assert.equal(alert.info[0].areas[0].geometry, null);
+});
+
+test('NWS source is one request with its own byte limit', async () => {
+  const urls = [];
+  const accepts = [];
+  const body = JSON.stringify({
+    features: [
+      nwsFeature({ id: 'urn:oid:a' }),
+      nwsFeature({
+        id: 'urn:oid:b',
+        messageType: 'Update',
+        references: [{ identifier: 'urn:oid:never-seen', sent: 't' }],
+      }),
+    ],
+  });
+  const proxy = capProxy({
+    fetchImpl: async (url, init) => {
+      urls.push(url);
+      accepts.push(init.headers.accept);
+      return okResponse(body);
+    },
+    sources: { nws: CAP_SOURCES.nws },
+    maxBytes: 16,
+    maxDocuments: 1,
+    now: () => Date.parse('2026-01-02T12:00:00Z'),
+  });
+  const result = await runProxy(proxy);
+  assert.deepEqual(urls, ['https://api.weather.gov/alerts/active']);
+  assert.deepEqual(accepts, ['application/geo+json']);
+  assert.deepEqual(result.alerts.map((a) => a.identifier).sort(), [
+    'urn:oid:a',
+    'urn:oid:never-seen',
+  ]);
+  assert.equal(result.alerts[0].region, 'US');
 });

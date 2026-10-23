@@ -33,7 +33,6 @@ export function createCapState({ now = () => Date.now() } = {}) {
         const old = records.get(target);
         if (cancelled.has(target) || (old && time(alert) <= time(old)))
           continue;
-        if (alert.msgType === 'Update' && !old) continue;
         records.set(target, { ...alert, identifier: target });
       }
       return this.snapshot();

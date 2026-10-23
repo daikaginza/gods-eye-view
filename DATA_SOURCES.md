@@ -29,9 +29,12 @@ UNGRD, HMS, NWS, DWD, MET Norway, MetService and NEMA. IDAP's alternate URL,
 UNB, ECCC and Meteoalarm are opt-in through `CAP_OPT_IN_SOURCES`; IFRC, WMO/SWIC
 and KDE remain disabled until a direct feed contract is confirmed. RSS/Atom
 links are followed only on the registered HTTPS host/path; redirects,
-arbitrary XML links and GeoJSON are rejected. Attribution and redistribution
-terms remain those of each publisher. CAP alerts are advisory, not a
-replacement for official emergency communications.
+arbitrary XML links and GeoJSON are rejected. NWS is the one exception: it is
+read from its documented GeoJSON alerts API (`api.weather.gov/alerts/active`,
+U.S. public domain) in one request with its own 16 MiB limit, because its Atom
+index would need one CAP document fetch per alert (~500 on an ordinary day).
+Attribution and redistribution terms remain those of each publisher. CAP alerts
+are advisory, not a replacement for official emergency communications.
 
 | Source                                                                | Used for                                                                                                                            | License / terms                                                                                                                                                                                                                                                                                                                                       | Attribution                                                                                                                                 |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |

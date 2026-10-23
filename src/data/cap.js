@@ -124,3 +124,77 @@ export function parseCap(xml, opt = {}) {
     })),
   }));
 }
+// NWS serves the same CAP fields as GeoJSON in one response
+// (https://www.weather.gov/documentation/services-web-api), so the whole
+// active set arrives without one CAP document fetch per alert.
+const nwsGeometry = (g) => {
+  const ring = g?.type === 'Polygon' ? g.coordinates?.[0] : null;
+  if (!Array.isArray(ring) || ring.length < 3) return null;
+  const v = ring.map((p) => (Array.isArray(p) ? [p[1], p[0]] : []));
+  return v.every(
+    (q) =>
+      q.length === 2 &&
+      q.every(Number.isFinite) &&
+      q[0] >= -90 &&
+      q[0] <= 90 &&
+      q[1] >= -180 &&
+      q[1] <= 180,
+  )
+    ? { type: 'polygon', coordinates: v }
+    : null;
+};
+const str = (x, o) => (typeof x === 'string' ? x.slice(0, o.maxText) : null);
+export function parseNwsAlerts(text, opt = {}) {
+  const o = { ...D, maxItems: 5000, ...opt };
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    throw Error('invalid_cap');
+  }
+  const features = doc?.features;
+  if (!Array.isArray(features) || features.length > o.maxItems)
+    throw Error('invalid_cap');
+  return features.flatMap((f) => {
+    const p = f?.properties;
+    if (!p || typeof p.id !== 'string') return [];
+    return [
+      {
+        identifier: p.id,
+        sender: str(p.sender, o),
+        sent: str(p.sent, o),
+        msgType: str(p.messageType, o),
+        status: str(p.status, o),
+        scope: str(p.scope, o),
+        references: Array.isArray(p.references)
+          ? p.references
+              .filter((r) => typeof r?.identifier === 'string')
+              .map((r) => `${r.sender || ''},${r.identifier},${r.sent || ''}`)
+              .join(' ')
+          : null,
+        info: [
+          {
+            language: str(p.language, o),
+            category: str(p.category, o),
+            event: str(p.event, o),
+            urgency: str(p.urgency, o),
+            severity: str(p.severity, o),
+            certainty: str(p.certainty, o),
+            headline: str(p.headline, o),
+            description: str(p.description, o),
+            instruction: str(p.instruction, o),
+            onset: str(p.onset, o),
+            expires: str(p.expires, o),
+            areas: [
+              {
+                description: str(p.areaDesc, o),
+                geometry: nwsGeometry(f.geometry),
+                geocode: str(p.geocode?.UGC?.[0], o),
+              },
+            ],
+          },
+        ],
+      },
+    ];
+  });
+}
