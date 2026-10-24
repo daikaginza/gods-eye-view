@@ -1,4 +1,8 @@
-import { parseCap, parseNwsAlerts } from '../../src/data/cap.js';
+import {
+  parseCap,
+  parseEcccAlerts,
+  parseNwsAlerts,
+} from '../../src/data/cap.js';
 import { createCapState } from '../../src/data/capState.js';
 import { readResponseTextCapped } from './common/http.js';
 
@@ -63,7 +67,18 @@ export const CAP_SOURCES = Object.freeze({
     ...e('https://api.weather.gov/alerts/active', 'US', 'nws-geojson'),
     maxBytes: 16 * 1024 * 1024,
   },
-  eccc: e('https://weather.gc.ca/rss/warning/', 'Canada', 'catalog', false),
+  // MSC GeoMet holds every active ECCC alert, one feature per alert area
+  // (~3 MB for ~380 areas, ~5 s to answer); the CAP-CP files on the Datamart
+  // are one document per message with no index of the active set.
+  eccc: {
+    ...e(
+      'https://api.weather.gc.ca/collections/weather-alerts/items?f=json&limit=10000',
+      'Canada',
+      'eccc-geojson',
+    ),
+    maxBytes: 32 * 1024 * 1024,
+    timeoutMs: 30000,
+  },
   dwd: e(
     'https://www.dwd.de/DWD/warnungen/cap-feed/en/rss.xml',
     'Germany',
@@ -84,6 +99,10 @@ export const CAP_SOURCES = Object.freeze({
   ifrc: e('', 'global', 'catalog', false),
   wmo: e('', 'global', 'catalog', false),
   kde: e('', 'global', 'catalog', false),
+});
+const GEOJSON_PARSERS = Object.freeze({
+  'nws-geojson': parseNwsAlerts,
+  'eccc-geojson': parseEcccAlerts,
 });
 function pathWithinPrefix(pathname, prefix) {
   const root = prefix.length > 1 ? prefix.replace(/\/+$/, '') : prefix;
@@ -146,9 +165,15 @@ export function capProxy({
   let generatedAt = null;
   let refreshPromise = null;
 
-  const fetchText = async (url, accept, region, limit = maxBytes) => {
+  const fetchText = async (
+    url,
+    accept,
+    region,
+    limit = maxBytes,
+    waitMs = timeoutMs,
+  ) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), waitMs);
     try {
       const response = await fetchImpl(url, {
         redirect: 'error',
@@ -183,18 +208,19 @@ export function capProxy({
           const [, source] = queue[cursor++];
           if (!source?.url) continue;
           try {
-            const geojson = source.format === 'nws-geojson';
+            const parseGeoJson = GEOJSON_PARSERS[source.format];
             const body = await fetchText(
               source.url,
-              geojson
+              parseGeoJson
                 ? 'application/geo+json'
                 : 'application/xml, application/rss+xml, application/atom+xml, text/xml',
               source.region,
               source.maxBytes || maxBytes,
+              Math.max(timeoutMs, source.timeoutMs || 0),
             );
-            if (geojson) {
+            if (parseGeoJson) {
               parsed.push(
-                ...parseNwsAlerts(body).map((alert) => ({
+                ...parseGeoJson(body).map((alert) => ({
                   ...alert,
                   source: source.url,
                   region: source.region,

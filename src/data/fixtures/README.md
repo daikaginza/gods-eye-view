@@ -41,3 +41,15 @@
   2026-09-25. Each record names its XYZ tile and expected traffic eligibility.
   Modified, test-only OpenStreetMap data; same ODbL attribution and database
   share-alike terms as the OpenFreeMap fixtures above.
+- `eccc-geomet-alerts.json` — 12 features of the MSC GeoMet `weather-alerts`
+  collection
+  (`https://api.weather.gc.ca/collections/weather-alerts/items?f=json&limit=10000`),
+  retrieved 2026-10-24T02:59Z: a Newfoundland wind warning with four ended
+  areas and one continued, a winter storm warning whose two areas are
+  `changed_from`, the four ended areas of a Saskatchewan special weather
+  statement (its continued areas removed, so the alert is fully ended), and
+  one area of an Ontario statement. Polygons are cut to their first six
+  vertices plus the closing one and alert texts to 160 characters; every
+  other property is as served. Used by the CAP ECCC parser tests; never
+  loaded at runtime. Data Source: Environment and Climate Change Canada,
+  [ECCC Data Servers End-use Licence](https://eccc-msc.github.io/open-data/licence/readme_en/).

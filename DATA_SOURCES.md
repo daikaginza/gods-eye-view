@@ -25,14 +25,37 @@ terms remain those of each publisher.
 
 Direct CAP and RSS/Atom feeds are catalogued with explicit format, region and
 enablement state. Active entries include INMET, IDAP, SMN, DMC, INUMET, INAMHI,
-UNGRD, HMS, NWS, DWD, MET Norway, MetService and NEMA. IDAP's alternate URL,
-UNB, ECCC and Meteoalarm are opt-in through `CAP_OPT_IN_SOURCES`; IFRC, WMO/SWIC
+UNGRD, HMS, NWS, ECCC, DWD, MET Norway, MetService and NEMA. IDAP's alternate
+URL, UNB and Meteoalarm are opt-in through `CAP_OPT_IN_SOURCES`; IFRC, WMO/SWIC
 and KDE remain disabled until a direct feed contract is confirmed. RSS/Atom
 links are followed only on the registered HTTPS host/path; redirects,
-arbitrary XML links and GeoJSON are rejected. NWS is the one exception: it is
-read from its documented GeoJSON alerts API (`api.weather.gov/alerts/active`,
-U.S. public domain) in one request with its own 16 MiB limit, because its Atom
-index would need one CAP document fetch per alert (~500 on an ordinary day).
+arbitrary XML links and GeoJSON are rejected. NWS and ECCC are the two
+exceptions, each read from its publisher's documented GeoJSON API in one
+request. NWS uses `api.weather.gov/alerts/active` (U.S. public domain) with
+its own 16 MiB limit, because its Atom index would need one CAP document
+fetch per alert (~500 on an ordinary day).
+
+ECCC (Environment and Climate Change Canada, Meteorological Service of Canada)
+is read from the MSC GeoMet OGC API `weather-alerts` collection
+(`api.weather.gc.ca/collections/weather-alerts/items`, keyless), with its own
+32 MiB limit and 30 s timeout: about 3 MB and 5 s for 382 alert areas on
+2026-10-24. ECCC's CAP-CP files on the MSC Datamart are one document per
+message, with no index of the alerts currently in effect, so they cannot be
+read like an RSS feed. GeoMet serves one feature per alert area; the parser
+groups areas back into one alert per ECCC alert id (the id in each CAP
+message's `Parent_URI` parameter, stable across that alert's Updates). Areas
+whose status is `ended` are dropped, and an alert whose areas have all ended
+is removed; `changed_from` ("remplace") areas are active, because they carry
+the alert that replaced an earlier one there. GeoMet has no CAP urgency or
+certainty, so those stay empty; severity follows the alert colour (yellow
+Moderate, orange Severe, red Extreme, uncoloured statement Minor, as ECCC's
+own CAP sends for 915 of 917 yellow and both red messages in 31 days), and an
+English and a French info block are kept, as in ECCC's own CAP. It is on by
+default for the same reason as NWS: an official national publisher with a
+documented, keyless whole-set API. Terms: [ECCC Data Servers End-use
+Licence](https://eccc-msc.github.io/open-data/licence/readme_en/); attribution
+"Data Source: Environment and Climate Change Canada".
+
 Attribution and redistribution terms remain those of each publisher. CAP alerts
 are advisory, not a replacement for official emergency communications.
 
@@ -58,7 +81,7 @@ are advisory, not a replacement for official emergency communications.
 | **The Space Devs — Launch Library 2 v2.3**                            | Recent launch, payload, stage, and recovery metadata for Space Missions (30d)                                                       | [The Space Devs terms of use](https://github.com/TheSpaceDevs/Tutorials/blob/main/faqs/faq_TSD.md#terms-of-use): data may be used and shared in any form; avoid forwarding it without added value; attribution is encouraged (not mandatory). [Official API limits](https://ll.thespacedevs.com/docs/): 15 unauthenticated calls/hour; optional token | "Launch Library 2 — The Space Devs" (courtesy attribution)                                                                                  |
 | **Esri World Imagery** (ArcGIS Online tile service)                   | The keyless satellite basemap — the default landing when no Google/ion credential is configured, and the "Esri Satellite" map stack | [Esri Master Agreement](https://www.esri.com/en-us/legal/terms/full-master-agreement): the public World Imagery service is usable in public-facing apps with attribution; no key is required for this classic endpoint, but Esri governs and can change access — an app at scale should review current ArcGIS Location Platform terms                 | "Powered by Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community" (provider carries the service's own credit line) |
 | **USGS**                                                              | Earthquakes                                                                                                                         | U.S. public domain                                                                                                                                                                                                                                                                                                                                    | "Data courtesy of the U.S. Geological Survey"                                                                                               |
-| **Environment and Climate Change Canada** (MSC GeoMet OGC API) | Air quality (AQHI) — Canadian station observations | [ECCC Data Servers End-use Licence](https://eccc-msc.github.io/open-data/licence/readme_en/) (open, attribution required, no endorsement implied) | "Contains information licensed under the Environment and Climate Change Canada Data Servers End-use Licence" |
+| **Environment and Climate Change Canada** (MSC GeoMet OGC API) | Air quality (AQHI) — Canadian station observations; CAP alerts (`/api/cap`, `weather-alerts` collection) — Canadian weather warnings, watches, advisories and statements | [ECCC Data Servers End-use Licence](https://eccc-msc.github.io/open-data/licence/readme_en/) (open, attribution required, no endorsement implied) | "Contains information licensed under the Environment and Climate Change Canada Data Servers End-use Licence" |
 | **NASA GIBS** (WMTS tiles + Worldview Snapshots) and **NASA CMR** (granule catalog) | Recent Imagery layer: HLS S30/L30 (Sentinel-2, Landsat 8/9) and VIIRS true-colour tiles draped on the map, per-day thumbnails and PNG exports; the HLS granule catalog (dates, cloud, footprints) for a selected box | U.S. public domain (NASA data); keyless, browser-direct (CORS `*`); no bulk use — one 30-day catalog query per box, tiles bounded to the box, six tile requests in flight | "We acknowledge the use of imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS)." — [gibs.earthdata.nasa.gov](https://gibs.earthdata.nasa.gov), [HLS](https://lpdaac.usgs.gov/products/hlss30v002/) |
 | **NIFC WFIGS** (Wildland Fire Interagency Geospatial Services, ArcGIS feature service) | Fire Perimeters layer: current interagency wildfire incident perimeters, containment, and incident facts | U.S. public domain (interagency wildland-fire data published through the [NIFC Open Data portal](https://data-nifc.opendata.arcgis.com/)); fetched keyless through `/api/fire-perimeters` (5-minute server cache) with `exceededTransferLimit` paging | "Wildfire perimeters: National Interagency Fire Center (WFIGS)" |
 | **InciWeb** (inciweb.wildfire.gov)                                    | Per-incident "InciWeb ↗" card links to official incident pages (narratives, evacuation/closure notices) | U.S. government public incident information. Links are matched best-effort by incident name and state, with incident page origin and update times checked on selection. Same-origin `/api/fire-perimeters/inciweb` routes cache the catalog for 1 hour and publication metadata for 30 minutes; linked pages remain InciWeb content | "Incident information: InciWeb (inciweb.wildfire.gov)" |

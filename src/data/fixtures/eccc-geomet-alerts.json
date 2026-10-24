@@ -1,0 +1,536 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "33513774847910979202610220507_fea1-861",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-56.42390409, 47.50767431],
+            [-56.42, 47.61087821],
+            [-56.42, 48.25],
+            [-56.44588321, 48.25013781],
+            [-56.46437697, 48.25023196],
+            [-56.4660402, 48.24966448],
+            [-56.42390409, 47.50767431]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WDW",
+        "alert_type": "warning",
+        "alert_name_en": "wind warning",
+        "alert_name_fr": "avertissement de vent",
+        "alert_short_name_en": "Wind",
+        "alert_short_name_fr": "Vent",
+        "publication_datetime": "2026-10-23T21:08:18.508Z",
+        "expiration_datetime": "2026-10-24T05:02:18.508Z",
+        "validity_datetime": "2026-10-23T21:05:00.000Z",
+        "event_end_datetime": "2026-10-24T03:00:00.000Z",
+        "alert_text_en": "Strong winds are occurring.\n\nLocations: Connaigre, Burin Peninsula, and the Southern Avalon Peninsula. \n\nMaximum wind gusts: northeasterly 80 km/h, except 100 a",
+        "alert_text_fr": "Des vents forts soufflent actuellement.\n\nRégions : Connaigre, la péninsule de Burin et le sud de la péninsule d'Avalon.\n\nRafales maximales : du nord-est à 80 km",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Burgeo - Ramea",
+        "feature_name_fr": "Burgeo - Ramea",
+        "province": "NL",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-861"
+      }
+    },
+    {
+      "id": "33513774847910979202610220507_fea1-860",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-55, 47.91999817],
+            [-55, 48.25],
+            [-56.42, 48.25],
+            [-56.42, 47.61087821],
+            [-56.42390409, 47.50767431],
+            [-55.93213578, 47.16316911],
+            [-55, 47.91999817]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WDW",
+        "alert_type": "warning",
+        "alert_name_en": "wind warning",
+        "alert_name_fr": "avertissement de vent",
+        "alert_short_name_en": "Wind",
+        "alert_short_name_fr": "Vent",
+        "publication_datetime": "2026-10-23T22:25:41.975Z",
+        "expiration_datetime": "2026-10-24T05:00:41.975Z",
+        "validity_datetime": "2026-10-23T22:23:00.000Z",
+        "event_end_datetime": "2026-10-24T03:00:00.000Z",
+        "alert_text_en": "Strong winds are occurring.\n\nLocations: Burin Peninsula and the Southern Avalon Peninsula. \n\nMaximum wind gusts: northeasterly 80 km/h, except 100 along parts o",
+        "alert_text_fr": "Des vents forts soufflent actuellement.\n\nRégions : la péninsule de Burin et le sud de la péninsule d'Avalon.\n\nRafales maximales : du nord-est à 80 km/h, mais à ",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Connaigre",
+        "feature_name_fr": "Connaigre",
+        "province": "NL",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-860"
+      }
+    },
+    {
+      "id": "33513774847910979202610220507_fea1-858",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-53.58, 47.39195617],
+            [-53.79999924, 47.45999909],
+            [-54, 47.91999817],
+            [-54.06973082, 47.83358468],
+            [-54.07925811, 47.82608314],
+            [-54.41015562, 47.39782054],
+            [-53.58, 47.39195617]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WDW",
+        "alert_type": "warning",
+        "alert_name_en": "wind warning",
+        "alert_name_fr": "avertissement de vent",
+        "alert_short_name_en": "Wind",
+        "alert_short_name_fr": "Vent",
+        "publication_datetime": "2026-10-24T02:21:40.350Z",
+        "expiration_datetime": "2026-10-24T07:00:40.350Z",
+        "validity_datetime": "2026-10-24T02:19:00.000Z",
+        "event_end_datetime": "2026-10-24T05:00:00.000Z",
+        "alert_text_en": "Strong winds are occurring.\n\nLocations: Southeastern Avalon Peninsula. \n\nMaximum wind gusts: northeasterly 80 km/h, except 100 along parts of the coast.\n\nTime s",
+        "alert_text_fr": "Des vents forts soufflent actuellement.\n\nRégion : la péninsule d'Avalon Sud-Est.\n\nRafales maximales : du nord-est à 80 km/h, mais à 100 km/h le long de certaine",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Avalon Peninsula Southwest",
+        "feature_name_fr": "péninsule d'Avalon Sud-Ouest",
+        "province": "NL",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-858"
+      }
+    },
+    {
+      "id": "33513774847910979202610220507_fea1-859",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-54.41015562, 47.39782054],
+            [-54.07925811, 47.82608314],
+            [-54.06973082, 47.83358468],
+            [-54, 47.91999817],
+            [-55, 47.91999817],
+            [-55.1451381, 47.60427669],
+            [-54.41015562, 47.39782054]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WDW",
+        "alert_type": "warning",
+        "alert_name_en": "wind warning",
+        "alert_name_fr": "avertissement de vent",
+        "alert_short_name_en": "Wind",
+        "alert_short_name_fr": "Vent",
+        "publication_datetime": "2026-10-24T02:21:40.350Z",
+        "expiration_datetime": "2026-10-24T07:00:40.350Z",
+        "validity_datetime": "2026-10-24T02:19:00.000Z",
+        "event_end_datetime": "2026-10-24T05:00:00.000Z",
+        "alert_text_en": "Strong winds are occurring.\n\nLocations: Southeastern Avalon Peninsula. \n\nMaximum wind gusts: northeasterly 80 km/h, except 100 along parts of the coast.\n\nTime s",
+        "alert_text_fr": "Des vents forts soufflent actuellement.\n\nRégion : la péninsule d'Avalon Sud-Est.\n\nRafales maximales : du nord-est à 80 km/h, mais à 100 km/h le long de certaine",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Burin Peninsula",
+        "feature_name_fr": "péninsule de Burin",
+        "province": "NL",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-859"
+      }
+    },
+    {
+      "id": "33513774847910979202610220507_fea1-854",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-52.9110835, 46.79933249],
+            [-52.9466205, 46.80161371],
+            [-52.95774711, 46.8],
+            [-52.95992011, 46.80000094],
+            [-53.04, 46.8],
+            [-53.04, 47.22494117],
+            [-52.9110835, 46.79933249]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WDW",
+        "alert_type": "warning",
+        "alert_name_en": "wind warning",
+        "alert_name_fr": "avertissement de vent",
+        "alert_short_name_en": "Wind",
+        "alert_short_name_fr": "Vent",
+        "publication_datetime": "2026-10-24T02:21:40.350Z",
+        "expiration_datetime": "2026-10-24T07:00:40.350Z",
+        "validity_datetime": "2026-10-24T02:19:00.000Z",
+        "event_end_datetime": "2026-10-24T05:00:00.000Z",
+        "alert_text_en": "Strong winds are occurring.\n\nLocations: Southeastern Avalon Peninsula. \n\nMaximum wind gusts: northeasterly 80 km/h, except 100 along parts of the coast.\n\nTime s",
+        "alert_text_fr": "Des vents forts soufflent actuellement.\n\nRégion : la péninsule d'Avalon Sud-Est.\n\nRafales maximales : du nord-est à 80 km/h, mais à 100 km/h le long de certaine",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": "High",
+        "confidence_fr": "élevée",
+        "impact_en": "Moderate",
+        "impact_fr": "modéré",
+        "feature_name_en": "Avalon Peninsula Southeast",
+        "feature_name_fr": "péninsule d'Avalon Sud-Est",
+        "province": "NL",
+        "status_en": "continued",
+        "status_fr": "maintenu",
+        "feature_id": "fea1-854"
+      }
+    },
+    {
+      "id": "13704565643585161202610240501_fea1-2502",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-94.02690104, 61.29606634],
+            [-94.05427531, 61.29673391],
+            [-94.06417826, 61.29829412],
+            [-94.070236, 61.30187993],
+            [-94.07519768, 61.30510075],
+            [-94.0930824, 61.30786594],
+            [-94.02690104, 61.29606634]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WSW",
+        "alert_type": "warning",
+        "alert_name_en": "winter storm warning",
+        "alert_name_fr": "avertissement de tempête hivernale",
+        "alert_short_name_en": "Winter storm",
+        "alert_short_name_fr": "Tempête hivernale",
+        "publication_datetime": "2026-10-24T01:37:04.565Z",
+        "expiration_datetime": "2026-10-24T17:37:04.565Z",
+        "validity_datetime": "2026-10-24T12:00:00.000Z",
+        "event_end_datetime": "2026-10-25T18:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northeastern Manitoba and the southern Kivalliq beginning saturday and will persist through the weekend.\n\nWhere: Churchill ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord-est du Manitoba et le sud du Kivalliq à compter de samedi et persistera toute la fin de semaine.\n\nOù : Churchi",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": "High",
+        "confidence_fr": "élevée",
+        "impact_en": "Moderate",
+        "impact_fr": "modéré",
+        "feature_name_en": "Arviat",
+        "feature_name_fr": "Arviat",
+        "province": "NU",
+        "status_en": "changed_from",
+        "status_fr": "remplace",
+        "feature_id": "fea1-2502"
+      }
+    },
+    {
+      "id": "13704565643585161202610240501_fea1-1510",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-92.73527016, 56.92536689],
+            [-92.51767026, 57.11023736],
+            [-92.39591759, 57.30828218],
+            [-92.47318167, 57.50583737],
+            [-92.52382255, 57.59842218],
+            [-92.73899955, 57.84476358],
+            [-92.73527016, 56.92536689]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "WSW",
+        "alert_type": "warning",
+        "alert_name_en": "winter storm warning",
+        "alert_name_fr": "avertissement de tempête hivernale",
+        "alert_short_name_en": "Winter storm",
+        "alert_short_name_fr": "Tempête hivernale",
+        "publication_datetime": "2026-10-24T01:37:04.565Z",
+        "expiration_datetime": "2026-10-24T17:37:04.565Z",
+        "validity_datetime": "2026-10-24T12:00:00.000Z",
+        "event_end_datetime": "2026-10-25T18:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northeastern Manitoba and the southern Kivalliq beginning saturday and will persist through the weekend.\n\nWhere: Churchill ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord-est du Manitoba et le sud du Kivalliq à compter de samedi et persistera toute la fin de semaine.\n\nOù : Churchi",
+        "risk_colour_en": "yellow",
+        "risk_colour_fr": "jaune",
+        "confidence_en": "High",
+        "confidence_fr": "élevée",
+        "impact_en": "Moderate",
+        "impact_fr": "modéré",
+        "feature_name_en": "Churchill",
+        "feature_name_fr": "Churchill",
+        "province": "MB",
+        "status_en": "changed_from",
+        "status_fr": "remplace",
+        "feature_id": "fea1-1510"
+      }
+    },
+    {
+      "id": "453197841867508436202610220501_fea1-1876",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-106.4297406, 58.39991796],
+            [-108.04974819, 58.39992266],
+            [-108.04976898, 57.40908535],
+            [-108.04977682, 56.36973302],
+            [-108.06061848, 56.35836585],
+            [-108.07755775, 56.34058932],
+            [-106.4297406, 58.39991796]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "SPS",
+        "alert_type": "statement",
+        "alert_name_en": "special weather statement",
+        "alert_name_fr": "bulletin météorologique spécial",
+        "alert_short_name_en": "Special weather",
+        "alert_short_name_fr": "Météorologique spécial",
+        "publication_datetime": "2026-10-23T11:14:16.916Z",
+        "expiration_datetime": "2026-10-24T03:14:16.916Z",
+        "validity_datetime": "2026-10-23T18:00:00.000Z",
+        "event_end_datetime": "2026-10-25T12:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northern Saskatchewan beginning on Friday and will persist through Saturday and into Saturday night. \n\nPrecipitation  with ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord de la Saskatchewan à compter de vendredi et persistera samedi et jusque dans la nuit de samedi à dimanche.\n\nLe",
+        "risk_colour_en": null,
+        "risk_colour_fr": null,
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Cree Lake - Key Lake",
+        "feature_name_fr": "Cree Lake - lac Key",
+        "province": "SK",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-1876"
+      }
+    },
+    {
+      "id": "453197841867508436202610220501_fea1-1875",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-108.04976898, 57.40908535],
+            [-108.05000305, 57.40908728],
+            [-110.00591119, 57.40909804],
+            [-110.00590118, 57.38068471],
+            [-110.00590522, 57.37345053],
+            [-110.00589181, 57.32913635],
+            [-108.04976898, 57.40908535]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "SPS",
+        "alert_type": "statement",
+        "alert_name_en": "special weather statement",
+        "alert_name_fr": "bulletin météorologique spécial",
+        "alert_short_name_en": "Special weather",
+        "alert_short_name_fr": "Météorologique spécial",
+        "publication_datetime": "2026-10-23T11:14:16.916Z",
+        "expiration_datetime": "2026-10-24T03:14:16.916Z",
+        "validity_datetime": "2026-10-23T18:00:00.000Z",
+        "event_end_datetime": "2026-10-25T12:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northern Saskatchewan beginning on Friday and will persist through Saturday and into Saturday night. \n\nPrecipitation  with ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord de la Saskatchewan à compter de vendredi et persistera samedi et jusque dans la nuit de samedi à dimanche.\n\nLe",
+        "risk_colour_en": null,
+        "risk_colour_fr": null,
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "La Loche and Clearwater River Prov. Park",
+        "feature_name_fr": "La Loche et Clearwater River Prov. Park",
+        "province": "SK",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-1875"
+      }
+    },
+    {
+      "id": "453197841867508436202610220501_fea1-1878",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-102.00739548, 57.11001702],
+            [-102.00739548, 57.11003059],
+            [-102.00740099, 57.21237679],
+            [-102.00740658, 57.32544024],
+            [-102.00741559, 57.50640625],
+            [-102.00743803, 57.94893053],
+            [-102.00739548, 57.11001702]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "SPS",
+        "alert_type": "statement",
+        "alert_name_en": "special weather statement",
+        "alert_name_fr": "bulletin météorologique spécial",
+        "alert_short_name_en": "Special weather",
+        "alert_short_name_fr": "Météorologique spécial",
+        "publication_datetime": "2026-10-23T11:14:16.916Z",
+        "expiration_datetime": "2026-10-24T03:14:16.916Z",
+        "validity_datetime": "2026-10-23T18:00:00.000Z",
+        "event_end_datetime": "2026-10-25T12:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northern Saskatchewan beginning on Friday and will persist through Saturday and into Saturday night. \n\nPrecipitation  with ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord de la Saskatchewan à compter de vendredi et persistera samedi et jusque dans la nuit de samedi à dimanche.\n\nLe",
+        "risk_colour_en": null,
+        "risk_colour_fr": null,
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Southend - Brabant Lake - Kinoosao",
+        "feature_name_fr": "Southend - Brabant Lake - Kinoosao",
+        "province": "SK",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-1878"
+      }
+    },
+    {
+      "id": "453197841867508436202610220501_fea1-1877",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-102.00759119, 59.99922007],
+            [-102.01099983, 59.99922006],
+            [-102.03199983, 59.99922006],
+            [-102.07409983, 59.99922006],
+            [-102.15819983, 59.99919006],
+            [-102.19199983, 59.99916006],
+            [-102.00759119, 59.99922007]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "SPS",
+        "alert_type": "statement",
+        "alert_name_en": "special weather statement",
+        "alert_name_fr": "bulletin météorologique spécial",
+        "alert_short_name_en": "Special weather",
+        "alert_short_name_fr": "Météorologique spécial",
+        "publication_datetime": "2026-10-23T11:14:16.916Z",
+        "expiration_datetime": "2026-10-24T03:14:16.916Z",
+        "validity_datetime": "2026-10-23T18:00:00.000Z",
+        "event_end_datetime": "2026-10-25T12:00:00.000Z",
+        "alert_text_en": "A significant fall storm will impact northern Saskatchewan beginning on Friday and will persist through Saturday and into Saturday night. \n\nPrecipitation  with ",
+        "alert_text_fr": "Une importante tempête automnale touchera le nord de la Saskatchewan à compter de vendredi et persistera samedi et jusque dans la nuit de samedi à dimanche.\n\nLe",
+        "risk_colour_en": null,
+        "risk_colour_fr": null,
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Wollaston Lake - Collins Bay",
+        "feature_name_fr": "Wollaston Lake - baie Collins",
+        "province": "SK",
+        "status_en": "ended",
+        "status_fr": "terminé",
+        "feature_id": "fea1-1877"
+      }
+    },
+    {
+      "id": "202949082276051729202610230503_fea1-1170",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-81.42363451, 52.48812375],
+            [-82.22167633, 53.02562508],
+            [-81.96327319, 53.34167432],
+            [-81.95688623, 53.98044146],
+            [-82.22947714, 54.00047332],
+            [-82.23690332, 54.00066677],
+            [-81.42363451, 52.48812375]
+          ]
+        ]
+      },
+      "properties": {
+        "alert_code": "SPS",
+        "alert_type": "statement",
+        "alert_name_en": "special weather statement",
+        "alert_name_fr": "bulletin météorologique spécial",
+        "alert_short_name_en": "Special weather",
+        "alert_short_name_fr": "Météorologique spécial",
+        "publication_datetime": "2026-10-23T21:01:42.290Z",
+        "expiration_datetime": "2026-10-24T13:01:42.290Z",
+        "validity_datetime": "2026-10-24T16:00:00.000Z",
+        "event_end_datetime": "2026-10-26T00:00:00.000Z",
+        "alert_text_en": "Gusty winds this weekend.\n\nWhat:\nWesterly winds gusting 70 to 90 km/h.\n\nWhen:\nSaturday afternoon to Sunday.\n\nAdditional information:\nA low pressure system will ",
+        "alert_text_fr": "Vents soufflant en rafales cette fin de semaine.\n\nQuoi :\nVents d'ouest soufflant en rafales de 70 à 90 km/h.\n\nQuand :\nDe samedi après-midi à dimanche.\n\nRenseign",
+        "risk_colour_en": null,
+        "risk_colour_fr": null,
+        "confidence_en": null,
+        "confidence_fr": null,
+        "impact_en": null,
+        "impact_fr": null,
+        "feature_name_en": "Attawapiskat",
+        "feature_name_fr": "Attawapiskat",
+        "province": "ON",
+        "status_en": "issued",
+        "status_fr": "émis",
+        "feature_id": "fea1-1170"
+      }
+    }
+  ],
+  "numberMatched": 12,
+  "numberReturned": 12,
+  "timeStamp": "2026-10-24T02:59:38.222976Z"
+}

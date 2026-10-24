@@ -1941,6 +1941,15 @@ and areas with polygon or circle geometry) plus its `source` URL and `region`.
 - The US National Weather Service is read from its GeoJSON alerts API
   (`api.weather.gov/alerts/active`) in one request with its own 16 MiB cap, so
   the whole active set arrives without per-alert document fetches.
+- Environment and Climate Change Canada is read from the MSC GeoMet
+  `weather-alerts` collection (`api.weather.gc.ca`, OGC API Features) in one
+  request with its own 32 MiB cap and 30 s timeout. GeoMet serves one feature
+  per alert area; areas are grouped into one alert per ECCC alert id, `ended`
+  areas are dropped and an alert whose areas have all ended is passed on as a
+  Cancel. Each alert has an en-CA info with the area polygons and a fr-CA info
+  with the French text and area names. Severity comes from the alert colour
+  (yellow Moderate, orange Severe, red Extreme, uncoloured statement Minor);
+  urgency and certainty are empty because GeoMet does not carry them.
 - Alerts pass through a lifecycle state: an Update replaces the alert it
   references (and is kept when that original is no longer listed), a Cancel
   removes it and keeps it from returning, and an alert past its `expires` is

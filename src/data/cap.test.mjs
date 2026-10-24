@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCap, parseNwsAlerts } from './cap.js';
+import { readFileSync } from 'node:fs';
+import { parseCap, parseEcccAlerts, parseNwsAlerts } from './cap.js';
 import { createCapState } from './capState.js';
 import {
   allowedCapUrl,
@@ -15,6 +16,8 @@ test('catalogue keeps supplied endpoints and formats', () => {
     'https://apiprevmet3.inmet.gov.br/avisos/rss',
   );
   assert.equal(CAP_SOURCES.nws.format, 'nws-geojson');
+  assert.equal(CAP_SOURCES.eccc.format, 'eccc-geojson');
+  assert.equal(CAP_SOURCES.eccc.enabled, true);
   assert.equal(CAP_SOURCES['met-norway'].format, 'cap');
 });
 test('pure RSS/Atom link whitelist accepts same path only', () => {
@@ -28,12 +31,12 @@ test('pure RSS/Atom link whitelist accepts same path only', () => {
   );
 });
 test('uncertain catalogues stay disabled and opt-in is recognized', () => {
-  assert.equal(CAP_SOURCES.eccc.enabled, false);
+  assert.equal(CAP_SOURCES.meteoalarm.enabled, false);
   const old = process.env.CAP_OPT_IN_SOURCES;
-  process.env.CAP_OPT_IN_SOURCES = 'eccc';
+  process.env.CAP_OPT_IN_SOURCES = 'meteoalarm';
   assert.ok(
     capProxy({
-      sources: { eccc: CAP_SOURCES.eccc },
+      sources: { meteoalarm: CAP_SOURCES.meteoalarm },
       fetchImpl: async () => {
         throw Error('offline');
       },
@@ -513,4 +516,201 @@ test('NWS source is one request with its own byte limit', async () => {
     'urn:oid:never-seen',
   ]);
   assert.equal(result.alerts[0].region, 'US');
+});
+
+// Trimmed from the live MSC GeoMet weather-alerts collection (2026-10-24,
+// see fixtures/README.md): a Newfoundland wind warning with four ended areas
+// and one continued, a winter storm warning that replaced a wind warning on
+// two areas (changed_from), the ended areas of a Saskatchewan statement, and
+// one area of an Ontario statement.
+const ecccFixture = readFileSync(
+  new URL('./fixtures/eccc-geomet-alerts.json', import.meta.url),
+  'utf8',
+);
+const ecccById = (text = ecccFixture) =>
+  Object.fromEntries(parseEcccAlerts(text).map((a) => [a.identifier, a]));
+
+test('ECCC GeoMet areas are grouped into one alert per ECCC alert id', () => {
+  const alerts = ecccById();
+  assert.deepEqual(Object.keys(alerts).sort(), [
+    '13704565643585161202610240501',
+    '202949082276051729202610230503',
+    '33513774847910979202610220507',
+    '453197841867508436202610220501',
+  ]);
+  const storm = alerts['13704565643585161202610240501'];
+  assert.equal(storm.msgType, 'Alert');
+  assert.equal(storm.sent, '2026-10-24T01:37:04.565Z');
+  assert.deepEqual(
+    storm.info.map((i) => i.language),
+    ['en-CA', 'fr-CA'],
+  );
+  const [en, fr] = storm.info;
+  assert.equal(en.event, 'winter storm warning');
+  assert.equal(en.headline, 'winter storm warning (yellow)');
+  assert.equal(fr.headline, 'avertissement de tempête hivernale (jaune)');
+  assert.equal(en.onset, '2026-10-24T12:00:00.000Z');
+  assert.equal(en.expires, '2026-10-24T17:37:04.565Z');
+  assert.match(en.description, /^A significant fall storm/);
+  assert.deepEqual(
+    en.areas.map((a) => [a.description, a.geocode]),
+    [
+      ['Arviat', 'fea1-2502'],
+      ['Churchill', 'fea1-1510'],
+    ],
+  );
+  assert.ok(en.areas.every((a) => a.geometry?.type === 'polygon'));
+  assert.ok(fr.areas.every((a) => a.geometry === null));
+});
+
+test('ECCC ended areas are dropped and an all-ended alert is a Cancel', () => {
+  const alerts = ecccById();
+  const wind = alerts['33513774847910979202610220507'];
+  assert.deepEqual(
+    wind.info[0].areas.map((a) => a.description),
+    ['Avalon Peninsula Southeast'],
+  );
+  assert.equal(wind.info[0].expires, '2026-10-24T07:00:40.350Z');
+  const ended = alerts['453197841867508436202610220501'];
+  assert.equal(ended.msgType, 'Cancel');
+  assert.deepEqual(ended.info, []);
+  // Served through the lifecycle state: the cancelled statement disappears
+  // even though its last version has not expired yet.
+  const state = createCapState({
+    now: () => Date.parse('2026-10-23T12:00:00Z'),
+  });
+  state.ingest([
+    {
+      ...ended,
+      msgType: 'Alert',
+      info: [{ expires: '2026-10-24T03:14:16.916Z' }],
+    },
+  ]);
+  assert.equal(state.snapshot().length, 1);
+  state.ingest([ended]);
+  assert.equal(state.snapshot().length, 0);
+});
+
+test('ECCC sent follows the newest area change, ended areas included', () => {
+  const doc = JSON.parse(ecccFixture);
+  const area = doc.features.find(
+    (f) => f.id === '33513774847910979202610220507_fea1-861',
+  );
+  area.properties.publication_datetime = '2026-10-24T03:03:34.000Z';
+  const shrunk = ecccById(JSON.stringify(doc))['33513774847910979202610220507'];
+  assert.equal(shrunk.sent, '2026-10-24T03:03:34.000Z');
+  const state = createCapState({
+    now: () => Date.parse('2026-10-24T03:30:00Z'),
+  });
+  const wider = {
+    ...shrunk,
+    sent: '2026-10-24T02:21:40.350Z',
+    info: [{ ...shrunk.info[0], areas: [{}, {}] }],
+  };
+  state.ingest([wider]);
+  const [served] = state.ingest([shrunk]);
+  assert.equal(served.info[0].areas.length, 1);
+});
+
+test('ECCC polygons are [lat, lon] and severity follows the alert colour', () => {
+  const alerts = ecccById();
+  const [first] =
+    alerts['33513774847910979202610220507'].info[0].areas[0].geometry
+      .coordinates;
+  // GeoJSON [lon, lat] on the Avalon Peninsula becomes CAP's lat,lon order.
+  assert.deepEqual(first, [46.79933249, -52.9110835]);
+  assert.equal(
+    alerts['33513774847910979202610220507'].info[0].severity,
+    'Moderate',
+  );
+  assert.equal(
+    alerts['202949082276051729202610230503'].info[0].severity,
+    'Minor',
+  );
+  const doc = JSON.parse(ecccFixture);
+  const recolour = (colour, type = 'warning') => {
+    for (const f of doc.features) {
+      f.properties.risk_colour_en = colour;
+      f.properties.alert_type = type;
+    }
+    return ecccById(JSON.stringify(doc))['13704565643585161202610240501']
+      .info[0].severity;
+  };
+  assert.equal(recolour('orange'), 'Severe');
+  assert.equal(recolour('red'), 'Extreme');
+  assert.equal(recolour(null), 'Unknown');
+  assert.equal(recolour(null, 'statement'), 'Minor');
+});
+
+test('ECCC GeoMet rejects bad documents and skips unkeyed features', () => {
+  assert.throws(() => parseEcccAlerts('<html>'));
+  assert.throws(() => parseEcccAlerts('{"type":"FeatureCollection"}'));
+  assert.throws(() =>
+    parseEcccAlerts(JSON.stringify({ features: [{}, {}] }), { maxItems: 1 }),
+  );
+  const doc = JSON.parse(ecccFixture);
+  const [good] = doc.features.filter(
+    (f) => f.id === '202949082276051729202610230503_fea1-1170',
+  );
+  const badRing = structuredClone(good);
+  badRing.id = 'x_fea1-1';
+  badRing.properties.feature_id = 'fea1-1';
+  badRing.geometry.coordinates[0][1] = [-83, 141];
+  const parsed = parseEcccAlerts(
+    JSON.stringify({
+      features: [
+        good,
+        badRing,
+        { ...good, id: 'fea1-1170' },
+        { ...good, id: 42 },
+        { id: 'y_fea1-2', properties: null },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    parsed.map((a) => a.identifier),
+    ['202949082276051729202610230503', 'x'],
+  );
+  assert.equal(parsed[1].info[0].areas[0].geometry, null);
+});
+
+test('ECCC source is one request with its own byte and time limits', async () => {
+  const urls = [];
+  const accepts = [];
+  const proxy = capProxy({
+    fetchImpl: async (url, init) => {
+      urls.push(url);
+      accepts.push(init.headers.accept);
+      // GeoMet takes seconds to answer; the global CAP timeout does not apply.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      if (init.signal.aborted) throw Error('aborted');
+      return okResponse(ecccFixture);
+    },
+    sources: { eccc: CAP_SOURCES.eccc },
+    maxBytes: 16,
+    maxDocuments: 1,
+    timeoutMs: 5,
+    now: () => Date.parse('2026-10-24T03:00:00Z'),
+  });
+  const result = await runProxy(proxy);
+  assert.deepEqual(urls, [
+    'https://api.weather.gc.ca/collections/weather-alerts/items?f=json&limit=10000',
+  ]);
+  assert.deepEqual(accepts, ['application/geo+json']);
+  assert.deepEqual(result.alerts.map((a) => a.identifier).sort(), [
+    '13704565643585161202610240501',
+    '202949082276051729202610230503',
+    '33513774847910979202610220507',
+  ]);
+  assert.ok(result.alerts.every((a) => a.region === 'Canada'));
+  // Past the wind warning's expires the lifecycle state drops it as usual.
+  const later = capProxy({
+    fetchImpl: async () => okResponse(ecccFixture),
+    sources: { eccc: CAP_SOURCES.eccc },
+    now: () => Date.parse('2026-10-24T08:00:00Z'),
+  });
+  assert.deepEqual(
+    (await runProxy(later)).alerts.map((a) => a.identifier).sort(),
+    ['13704565643585161202610240501', '202949082276051729202610230503'],
+  );
 });
